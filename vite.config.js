@@ -3,7 +3,7 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
-  base: '/gymtracker/',
+  base: '/Si-owniaMichu/',
   plugins: [
     react(),
     VitePWA({
@@ -17,8 +17,8 @@ export default defineConfig({
         background_color: '#080808',
         display: 'standalone',
         orientation: 'portrait',
-        scope: '/gymtracker/',
-        start_url: '/gymtracker/',
+        scope: '/Si-owniaMichu/',
+start_url: '/Si-owniaMichu/',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' }
