@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "2.3.0";
+const APP_VERSION = "2.3.1";
 const DATA_VERSION = 4;
 
 const storage = {
