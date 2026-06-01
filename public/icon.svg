@@ -1,8 +1,21 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#080808"/>
-  <rect x="40" y="220" width="80" height="72" rx="16" fill="#ef4444"/>
-  <rect x="392" y="220" width="80" height="72" rx="16" fill="#ef4444"/>
-  <rect x="100" y="196" width="60" height="120" rx="12" fill="#ef4444"/>
-  <rect x="352" y="196" width="60" height="120" rx="12" fill="#ef4444"/>
-  <rect x="148" y="232" width="216" height="48" rx="10" fill="#ef4444"/>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#2a2a2a"/>
+      <stop offset="100%" stop-color="#111111"/>
+    </radialGradient>
+  </defs>
+  <circle cx="256" cy="256" r="256" fill="url(#bg)"/>
+  <!-- flames -->
+  <path d="M256 80 C220 130 180 170 185 230 C190 270 215 295 240 305 C230 280 235 250 255 235 C255 265 270 295 256 320 C280 300 305 270 300 235 C320 255 325 285 315 310 C340 285 355 250 345 210 C335 170 290 130 256 80Z" fill="#ef4444"/>
+  <path d="M256 140 C235 170 215 200 220 240 C225 265 240 285 256 295 C272 285 287 265 292 240 C297 200 277 170 256 140Z" fill="#ff8c00"/>
+  <path d="M256 200 C242 220 235 245 240 265 C245 278 250 288 256 295 C262 288 267 278 272 265 C277 245 270 220 256 200Z" fill="#ffcc00"/>
+  <!-- dumbbell -->
+  <rect x="175" y="245" width="162" height="22" rx="6" fill="#1a1a1a"/>
+  <rect x="175" y="230" width="38" height="52" rx="8" fill="#333"/>
+  <rect x="299" y="230" width="38" height="52" rx="8" fill="#333"/>
+  <rect x="155" y="238" width="28" height="36" rx="6" fill="#444"/>
+  <rect x="329" y="238" width="28" height="36" rx="6" fill="#444"/>
+  <!-- GT text -->
+  <text x="256" y="390" text-anchor="middle" font-family="Arial Black" font-size="52" font-weight="900" fill="#ef4444" letter-spacing="2">GT</text>
 </svg>
