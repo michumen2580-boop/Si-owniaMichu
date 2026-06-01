@@ -1136,9 +1136,9 @@ function WeeklyMuscleProgress({history}) {
               <div key={m} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid var(--border)"}}>
                 <span style={{fontSize:14,color:MUSCLE_COLORS[m],fontWeight:700}}>{MUSCLE_LABELS[m]}</span>
                 <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <button onClick={()=>setTempGoals(p=>({...p,[m]:Math.max(1,(p[m]||9)-3)})} style={{width:32,height:32,borderRadius:8,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                  <button onClick={()=>setTempGoals(p=>({...p,[m]:Math.max(1,(p[m]||9)-3)}))} style={{width:32,height:32,borderRadius:8,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
                   <span style={{fontFamily:"'Bebas Neue'",fontSize:24,minWidth:32,textAlign:"center"}}>{tempGoals[m]||9}</span>
-                  <button onClick={()=>setTempGoals(p=>({...p,[m]:(p[m]||9)+3})} style={{width:32,height:32,borderRadius:8,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+                  <button onClick={()=>setTempGoals(p=>({...p,[m]:(p[m]||9)+3}))} style={{width:32,height:32,borderRadius:8,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:18,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
                 </div>
               </div>
             ))}
