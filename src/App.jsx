@@ -1061,20 +1061,39 @@ function ScreenDiet({saveDay}) {
           </div>
         )):<div style={{textAlign:"center",padding:24,color:"var(--muted)",fontSize:13}}>Brak posiłków dzisiaj</div>
       ):(
-        histDates.length>0?histDates.map(ds=>{ const dm=meals.filter(m=>m.date===ds); const dk=dm.reduce((s,m)=>s+(m.kcal||0),0); return (
-          <div key={ds} className="card" style={{marginBottom:8}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <span style={{fontWeight:700,fontSize:13}}>{fmt(ds)}</span>
-              <span style={{fontFamily:"'Bebas Neue'",fontSize:20,color:dk>goalKcal?"#ef4444":"#22c55e"}}>{dk} kcal</span>
-            </div>
-            {dm.slice(0,3).map(m=><div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderTop:"1px solid var(--border)"}}><span style={{fontSize:12,color:"var(--muted2)"}}>{m.name}</span><span style={{fontSize:12,color:"var(--muted)"}}>{m.kcal} kcal</span></div>)}
-            {dm.length>3&&<div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>+{dm.length-3} więcej</div>}
+                histDates.length > 0 ? (
+          histDates.map(ds => {
+            const dm = meals.filter(m => m.date === ds);
+            const dk = dm.reduce((s, m) => s + (m.kcal || 0), 0);
+            
+            return (
+              <div key={ds} className="card" style={{marginBottom:8}}>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                  <span style={{fontWeight:700,fontSize:13}}>{fmt(ds)}</span>
+                  <span style={{fontFamily:"'Bebas Neue'",fontSize:20,color:dk>goalKcal?"#ef4444":"#22c55e"}}>{dk} kcal</span>
+                </div>
+                {dm.slice(0,3).map(m=> (
+                  <div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderTop:"1px solid var(--border)"}}>
+                    <span style={{fontSize:12,color:"var(--muted2)"}}>{m.name}</span>
+                    <span style={{fontSize:12,color:"var(--muted)"}}>{m.kcal} kcal</span>
+                  </div>
+                ))}
+                {dm.length > 3 && (
+                  <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>+{dm.length-3} więcej</div>
+                )}
+              </div>
+            );
+          })
+        ) : (
+          <div style={{textAlign:"center",padding:24,color:"var(--muted)",fontSize:13}}>
+            Brak historii
           </div>
-        ):<div style={{textAlign:"center",padding:24,color:"var(--muted)",fontSize:13}}>Brak historii</div>
+        )
       )}
     </div>
   );
 }
+
 // ── SCREEN: KALENDARZ ─────────────────────────────────────────────────────────
 function ScreenCalendar({history,dayLogs,workoutDates,weeklyGoals,setWeeklyGoals,customExercises}) {
   const [calDate,setCalDate] = useState(()=>{ const n=new Date(); return {y:n.getFullYear(),m:n.getMonth()}; });
