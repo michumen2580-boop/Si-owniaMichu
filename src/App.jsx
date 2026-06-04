@@ -490,7 +490,7 @@ export default function App() {
   const last7 = Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-6+i); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; return !!(dayLogs[ds]?.workoutType||workoutDates[ds]); });
   const streak = (()=>{ let s=0,d=new Date(); for(let i=0;i<30;i++){ const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; if(dayLogs[ds]?.workoutType||workoutDates[ds]) s++; else if(i>0) break; d.setDate(d.getDate()-1); } return s; })();
 
-  const todayLog = dayLogs[todayStr]||{};
+  //const todayLog = dayLogs[todayStr]||{};
   const sharedProps = {history,setHistory,dayLogs,setDayLogs,saveDay,todayStr,todayLog,settings,customExercises,setCustomExercises,weeklyGoals,setWeeklyGoals,workoutDates};
 
   return (
@@ -1072,7 +1072,13 @@ function ScreenDiet({saveDay}) {
             {dm.slice(0,3).map(m=><div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderTop:"1px solid var(--border)"}}><span style={{fontSize:12,color:"var(--muted2)"}}>{m.name}</span><span style={{fontSize:12,color:"var(--muted)"}}>{m.kcal} kcal</span></div>)}
             {dm.length>3&&<div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>+{dm.length-3} więcej</div>}
           </div>
-        ):<div style={{textAlign:"center",padding:24,color:"var(--muted)",fontSize:13}}>Brak historii</div>
+        </div>
+    );
+  }) : (
+    <div style={{textAlign:"center",padding:24,color:"var(--muted)",fontSize:13}}>
+      Brak historii
+    </div>
+  )
       )}
     </div>
   );
