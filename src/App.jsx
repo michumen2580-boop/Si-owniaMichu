@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.3.5";
+const APP_VERSION = "4.3.7";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -271,6 +271,11 @@ export default function App() {
   // null = use defaults (all exercises), array = custom selection
   const [workoutTemplates, setWorkoutTemplates] = useState(()=>storage.get("workoutTemplates",{push:null,pull:null,fbw:null}));
   useEffect(()=>{ storage.set("workoutTemplates",workoutTemplates); },[workoutTemplates]);
+
+  const [geminiKey,  setGeminiKey]  = useState(()=>storage.get("geminiKey",""));
+  const [aiEnabled,  setAiEnabled]  = useState(()=>storage.get("aiEnabled",false));
+  useEffect(()=>{ storage.set("geminiKey", geminiKey); },[geminiKey]);
+  useEffect(()=>{ storage.set("aiEnabled", aiEnabled); },[aiEnabled]);
   const [customExercises, setCustomExercises] = useState(()=>storage.get("customExercises",[]));
   const [hiddenExercises, setHiddenExercises] = useState(()=>storage.get("hiddenExercises",[]));
   useEffect(()=>{ storage.set("hiddenExercises",hiddenExercises); },[hiddenExercises]);
@@ -349,8 +354,8 @@ export default function App() {
   const last7 = Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-6+i); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; return !!(dayLogs[ds]?.workoutType||workoutDates[ds]); });
   const streak = (()=>{ let s=0,d=new Date(); for(let i=0;i<30;i++){ const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; if(dayLogs[ds]?.workoutType||workoutDates[ds]) s++; else if(i>0) break; d.setDate(d.getDate()-1); } return s; })();
 
-  const aiActive = !!(storage.get("aiEnabled",false) && storage.get("geminiKey","").trim());
-  const sharedProps = {history,exerciseDB,setExerciseDB,dayLogs,setDayLogs,saveDay,todayStr,todayLog,settings,customExercises,setCustomExercises,hiddenExercises,setHiddenExercises,weeklyGoals,setWeeklyGoals,workoutDates,workoutTemplates,setWorkoutTemplates,aiActive};
+  const aiActive = !!(aiEnabled && geminiKey.trim());
+  const sharedProps = {history,exerciseDB,setExerciseDB,dayLogs,setDayLogs,saveDay,todayStr,todayLog,settings,customExercises,setCustomExercises,hiddenExercises,setHiddenExercises,weeklyGoals,setWeeklyGoals,workoutDates,workoutTemplates,setWorkoutTemplates,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnabled};
 
   return (
     <>
@@ -1137,7 +1142,7 @@ function CardioView({onBack,saveDay,todayStr}) {
 }
 
 // ── SCREEN: DIETA ─────────────────────────────────────────────────────────────
-function ScreenDiet({saveDay,aiActive}) {
+function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnabled}) {
   const [meals,setMeals]       = useState(()=>storage.get("meals",[]));
   const [goalKcal,setGoalKcal] = useState(()=>storage.get("goalKcal",2200));
   const [tdee,setTdee]         = useState(()=>storage.get("tdee",2500));
@@ -1148,10 +1153,9 @@ function ScreenDiet({saveDay,aiActive}) {
   const [aiLoading,  setAiLoading]  = useState(false);
   const [aiMode,     setAiMode]     = useState(false);
   const [aiDesc,     setAiDesc]     = useState("");
-  const [geminiKey,  setGeminiKey]  = useState(()=>storage.get("geminiKey",""));
-  const [aiEnabled,  setAiEnabled]  = useState(()=>storage.get("aiEnabled",false));
-  useEffect(()=>{ storage.set("geminiKey", geminiKey); },[geminiKey]);
-  useEffect(()=>{ storage.set("aiEnabled", aiEnabled); },[aiEnabled]);
+  const [aiPrompt,   setAiPrompt]   = useState(false);
+  const [geminiKeyInput, setGeminiKeyInput] = useState("");
+
   const [histTab,setHistTab]   = useState("today");
   useEffect(()=>{ storage.set("meals",meals); },[meals]);
   useEffect(()=>{ storage.set("goalKcal",goalKcal); },[goalKcal]);
