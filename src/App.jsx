@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.3.8";
+const APP_VERSION = "4.3.9";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1189,12 +1189,20 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
     const key = geminiKey.trim();
     if(!key) { alert("Wpisz klucz API Gemini!"); setAiLoading(false); return null; }
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
       { method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({ contents:[{ parts }] }) }
     );
     const json = await res.json();
-    if(json.error) { alert("Błąd Gemini: "+json.error.message); setAiLoading(false); return null; }
+    if(json.error) {
+      const msg = json.error.message||"";
+      if(json.error.code===429||msg.includes("429")||msg.includes("quota")||msg.includes("rate")) {
+        alert("⏳ Poczekaj chwilę i spróbuj ponownie\n(limit zapytań – max kilka na minutę)");
+      } else {
+        alert("Błąd Gemini: "+msg);
+      }
+      setAiLoading(false); return null;
+    }
     return json.candidates?.[0]?.content?.parts?.[0]?.text||"";
   };
 
