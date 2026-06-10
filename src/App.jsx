@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.3.4";
+const APP_VERSION = "4.3.5";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -349,6 +349,7 @@ export default function App() {
   const last7 = Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-6+i); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; return !!(dayLogs[ds]?.workoutType||workoutDates[ds]); });
   const streak = (()=>{ let s=0,d=new Date(); for(let i=0;i<30;i++){ const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; if(dayLogs[ds]?.workoutType||workoutDates[ds]) s++; else if(i>0) break; d.setDate(d.getDate()-1); } return s; })();
 
+  const aiActive = !!(storage.get("aiEnabled",false) && storage.get("geminiKey","").trim());
   const sharedProps = {history,exerciseDB,setExerciseDB,dayLogs,setDayLogs,saveDay,todayStr,todayLog,settings,customExercises,setCustomExercises,hiddenExercises,setHiddenExercises,weeklyGoals,setWeeklyGoals,workoutDates,workoutTemplates,setWorkoutTemplates,aiActive};
 
   return (
@@ -1151,7 +1152,6 @@ function ScreenDiet({saveDay,aiActive}) {
   const [aiEnabled,  setAiEnabled]  = useState(()=>storage.get("aiEnabled",false));
   useEffect(()=>{ storage.set("geminiKey", geminiKey); },[geminiKey]);
   useEffect(()=>{ storage.set("aiEnabled", aiEnabled); },[aiEnabled]);
-  const aiActive = aiEnabled && !!geminiKey.trim();
   const [histTab,setHistTab]   = useState("today");
   useEffect(()=>{ storage.set("meals",meals); },[meals]);
   useEffect(()=>{ storage.set("goalKcal",goalKcal); },[goalKcal]);
