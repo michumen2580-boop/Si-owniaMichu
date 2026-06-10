@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.3.3";
+const APP_VERSION = "4.3.4";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -475,20 +475,13 @@ function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,
             <div style={{marginTop:12}}>
               <div style={{fontSize:13,fontWeight:700,color:"var(--muted2)",marginBottom:8}}>KLUCZ GEMINI API</div>
               <div style={{fontSize:12,color:"var(--muted)",marginBottom:10,lineHeight:1.6,padding:"10px",background:"var(--card2)",borderRadius:8}}>
-                <strong>Jak zdobyć darmowy klucz:</strong>{"
-"}
-                1️⃣ Wejdź na <strong>aistudio.google.com</strong>{"
-"}
-                2️⃣ Zaloguj się kontem Google{"
-"}
-                3️⃣ Kliknij <strong>"Get API Key"</strong>{"
-"}
-                4️⃣ Wybierz <strong>"Create API key"</strong>{"
-"}
-                5️⃣ Skopiuj klucz i wklej poniżej{"
-
-"}
-                ✅ <strong>1500 analiz dziennie za darmo</strong>
+                <strong>Jak zdobyć darmowy klucz:</strong><br/>
+                {"1️⃣ Wejdź na "}<strong>aistudio.google.com</strong><br/>
+                {"2️⃣ Zaloguj się kontem Google"}<br/>
+                {"3️⃣ Kliknij "}<strong>&quot;Get API Key&quot;</strong><br/>
+                {"4️⃣ Wybierz "}<strong>&quot;Create API key&quot;</strong><br/>
+                {"5️⃣ Skopiuj klucz i wklej poniżej"}<br/><br/>
+                {"✅ "}<strong>1500 analiz dziennie za darmo</strong>
               </div>
               <input
                 placeholder="Wklej klucz API (AIza...)"
@@ -1224,9 +1217,7 @@ function ScreenDiet({saveDay,aiActive}) {
     setAiPrompt(false);
     try {
       const text = await callGemini([
-        {text: GEMINI_PROMPT + `
-
-Posiłek: ${desc}`}
+        {text: GEMINI_PROMPT + "\n\nPosiłek: " + desc}
       ]);
       if(text) parseAiMacro(text);
     } catch(e){ alert("Błąd: "+e.message); setAiLoading(false); }
