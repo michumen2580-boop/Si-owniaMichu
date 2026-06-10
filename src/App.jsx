@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.3.7";
+const APP_VERSION = "4.3.8";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -236,6 +236,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;ove
 .chip.active{border-color:currentColor;}
 @keyframes up{from{transform:translateY(16px);opacity:0}to{transform:translateY(0);opacity:1}}
 .anim{animation:up .25s ease;}
+@keyframes spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
 `;
 
 // ── ICONS ─────────────────────────────────────────────────────────────────────
@@ -332,14 +333,12 @@ export default function App() {
   const history = Object.entries(exerciseDB).flatMap(([name, ex])=>
     ex.history.map(h=>({...h, exercise:name}))
   ).sort((a,b)=>a.date>b.date?1:-1);
-  const setHistory = () => {}; // history is derived from exerciseDB now
   const [showSettings, setShowSettings] = useState(false);
 
   useEffect(()=>{ storage.set("appSettings",settings); },[settings]);
   useEffect(()=>{ storage.set("weeklyGoals",weeklyGoals); },[weeklyGoals]);
   useEffect(()=>{ storage.set("customExercises",customExercises); },[customExercises]);
   useEffect(()=>{ storage.set("dayLogs",dayLogs); },[dayLogs]);
-  useEffect(()=>{ storage.set("gymHistory",history); },[history]);
 
   const todayStr = today();
   const saveDay  = useCallback((data)=>{
@@ -992,7 +991,6 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
             ].sort((a,b)=>a.date>b.date?1:-1)
           };
         });
-        autoBackup(Object.values(next).flatMap(ex=>ex.history), {});
         return next;
       });
     }
@@ -1191,7 +1189,7 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
     const key = geminiKey.trim();
     if(!key) { alert("Wpisz klucz API Gemini!"); setAiLoading(false); return null; }
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${key}`,
       { method:"POST", headers:{"Content-Type":"application/json"},
         body:JSON.stringify({ contents:[{ parts }] }) }
     );
