@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.3.9";
+const APP_VERSION = "4.4.0";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -478,18 +478,18 @@ function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,
 
             {/* API Key section */}
             <div style={{marginTop:12}}>
-              <div style={{fontSize:13,fontWeight:700,color:"var(--muted2)",marginBottom:8}}>KLUCZ GEMINI API</div>
+              <div style={{fontSize:13,fontWeight:700,color:"var(--muted2)",marginBottom:8}}>KLUCZ OPENAI API</div>
               <div style={{fontSize:12,color:"var(--muted)",marginBottom:10,lineHeight:1.6,padding:"10px",background:"var(--card2)",borderRadius:8}}>
                 <strong>Jak zdobyć darmowy klucz:</strong><br/>
-                {"1️⃣ Wejdź na "}<strong>aistudio.google.com</strong><br/>
-                {"2️⃣ Zaloguj się kontem Google"}<br/>
-                {"3️⃣ Kliknij "}<strong>&quot;Get API Key&quot;</strong><br/>
-                {"4️⃣ Wybierz "}<strong>&quot;Create API key&quot;</strong><br/>
+                {"1️⃣ Wejdź na "}<strong>platform.openai.com</strong><br/>
+                {"2️⃣ Zaloguj się lub zarejestruj"}<br/>
+                {"3️⃣ Kliknij "}<strong>&quot;API keys&quot;</strong><br/>
+                {"4️⃣ Kliknij "}<strong>&quot;Create new secret key&quot;</strong><br/>
                 {"5️⃣ Skopiuj klucz i wklej poniżej"}<br/><br/>
-                {"✅ "}<strong>1500 analiz dziennie za darmo</strong>
+                {"💳 "}<strong>$5 kredytu startowego = ~5000 analiz</strong>
               </div>
               <input
-                placeholder="Wklej klucz API (AIza...)"
+                placeholder="Wklej klucz API (sk-...)"
                 value={keyInput}
                 onChange={e=>setKeyInput(e.target.value)}
                 style={{width:"100%",background:"var(--card2)",border:`1px solid ${keyInput?"#7c3aed44":"var(--border)"}`,borderRadius:8,padding:"10px 12px",color:"var(--text)",fontFamily:"'DM Sans'",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:8}}
@@ -1183,39 +1183,42 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
     setAiLoading(false);
   };
 
-  const GEMINI_PROMPT = 'Jesteś ekspertem od żywienia. Oszacuj wartości odżywcze tego posiłku. Użyj standardowych porcji jeśli nie podano gramatur. Odpowiedz WYŁĄCZNIE w formacie JSON (zero innych słów): {"name":"nazwa posiłku po polsku","kcal":500,"protein":30,"carbs":60,"fat":15}';
+  const AI_PROMPT = 'Jesteś ekspertem od żywienia. Oszacuj wartości odżywcze tego posiłku. Użyj standardowych porcji jeśli nie podano gramatur. Odpowiedz WYŁĄCZNIE w formacie JSON (zero innych słów): {"name":"nazwa posiłku po polsku","kcal":500,"protein":30,"carbs":60,"fat":15}';
 
-  const callGemini = async (parts) => {
+  const callOpenAI = async (messages) => {
     const key = geminiKey.trim();
-    if(!key) { alert("Wpisz klucz API Gemini!"); setAiLoading(false); return null; }
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`,
-      { method:"POST", headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({ contents:[{ parts }] }) }
-    );
+    if(!key) { alert("Wpisz klucz API OpenAI!"); setAiLoading(false); return null; }
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method:"POST",
+      headers:{"Content-Type":"application/json","Authorization":"Bearer "+key},
+      body:JSON.stringify({ model:"gpt-4o-mini", max_tokens:200, messages })
+    });
     const json = await res.json();
     if(json.error) {
       const msg = json.error.message||"";
-      if(json.error.code===429||msg.includes("429")||msg.includes("quota")||msg.includes("rate")) {
-        alert("⏳ Poczekaj chwilę i spróbuj ponownie\n(limit zapytań – max kilka na minutę)");
+      if(msg.includes("429")||msg.includes("quota")||msg.includes("rate")) {
+        alert("⏳ Poczekaj chwilę i spróbuj ponownie\n(limit zapytań)");
+      } else if(msg.includes("401")||msg.includes("Incorrect API key")) {
+        alert("❌ Nieprawidłowy klucz API OpenAI\nSprawdź klucz w ustawieniach.");
       } else {
-        alert("Błąd Gemini: "+msg);
+        alert("Błąd OpenAI: "+msg);
       }
       setAiLoading(false); return null;
     }
-    return json.candidates?.[0]?.content?.parts?.[0]?.text||"";
+    return json.choices?.[0]?.message?.content||"";
   };
 
   const analyzeImage = async (base64, extraDesc="") => {
     setAiLoading(true);
     try {
-      const mediaType = base64.startsWith("data:image/png")?"image/png"
-                       :base64.startsWith("data:image/webp")?"image/webp":"image/jpeg";
-      const data64 = base64.split(",")[1];
-      const text = await callGemini([
-        {inline_data:{mime_type:mediaType,data:data64}},
-        {text:GEMINI_PROMPT+(extraDesc?`\n\nDodatkowy opis: ${extraDesc}`:'')}
-      ]);
+      const messages = [
+        {role:"system", content:AI_PROMPT},
+        {role:"user", content:[
+          {type:"image_url", image_url:{url:base64, detail:"low"}},
+          ...(extraDesc?[{type:"text",text:"Dodatkowy opis: "+extraDesc}]:[])
+        ]}
+      ];
+      const text = await callOpenAI(messages);
       if(text) parseAiMacro(text);
     } catch(e){ alert("Błąd: "+e.message); setAiLoading(false); }
   };
@@ -1226,9 +1229,11 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
     setAiMode(false);
     setAiPrompt(false);
     try {
-      const text = await callGemini([
-        {text: GEMINI_PROMPT + "\n\nPosiłek: " + desc}
-      ]);
+      const messages = [
+        {role:"system", content:AI_PROMPT},
+        {role:"user", content:"Posiłek: "+desc}
+      ];
+      const text = await callOpenAI(messages);
       if(text) parseAiMacro(text);
     } catch(e){ alert("Błąd: "+e.message); setAiLoading(false); }
   };
@@ -1468,9 +1473,9 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
               {/* API Key input - shown if not saved */}
               {!geminiKey&&(
                 <div style={{marginBottom:8,padding:"8px 10px",background:"#ef444422",borderRadius:8,border:"1px solid #ef444444"}}>
-                  <div style={{fontSize:11,color:"#ef4444",fontWeight:700,marginBottom:4}}>⚠️ Wymagany klucz Gemini API</div>
+                  <div style={{fontSize:11,color:"#ef4444",fontWeight:700,marginBottom:4}}>⚠️ Wymagany klucz OpenAI API</div>
                   <div style={{fontSize:10,color:"var(--muted)",marginBottom:6}}>
-                    Pobierz za darmo na <strong>aistudio.google.com</strong> → Get API Key
+                    Pobierz za darmo na <strong>platform.openai.com</strong> → Get API Key
                   </div>
                   <input
                     placeholder="Wklej klucz AIza..."
