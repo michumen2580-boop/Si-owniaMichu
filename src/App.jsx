@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.5.1";
+const APP_VERSION = "4.5.2";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -957,19 +957,20 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
     const entries = exList
       .filter(ex => {
         const key = ex.id||ex.name;
-        const hasWeight = weights[key] !== undefined && weights[key] !== '' && !isNaN(parseFloat(weights[key]));
+        // Only save if user actually checked at least one set OR explicitly finished the exercise
         const hasDoneSets = (done[key]||[]).some(Boolean);
-        return (hasWeight || hasDoneSets) && !excluded.has(key);
+        const isFinished = finished_ex.has(key);
+        return (hasDoneSets || isFinished) && !excluded.has(key);
       })
       .map(ex => {
         const key = ex.id||ex.name;
-        const completedSets = finished_ex.has(key)
-          ? (done[key]||[]).filter(Boolean).length  // ZAKOŃCZ: actual done sets
-          : (done[key]||[]).filter(Boolean).length||3;
+        const doneSetsCount = (done[key]||[]).filter(Boolean).length;
+        // Use actual done sets; if none checked but has weight, assume 3 (user skipped checkboxes)
+        const completedSets = doneSetsCount > 0 ? doneSetsCount : 3;
         return {
           date: todayStr, type, exercise: ex.name,
           weight: parseFloat(weights[key]) || 0,
-          sets: completedSets || 1
+          sets: completedSets
         };
       });
     if(entries.length) {
@@ -1270,7 +1271,10 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
           const tP=todayMeals.reduce((s,m)=>s+(m.protein||0),0);
           const tC=todayMeals.reduce((s,m)=>s+(m.carbs||0),0);
           const tF=todayMeals.reduce((s,m)=>s+(m.fat||0),0);
-          const bw = (settings && settings.weight) ? Number(settings.weight) : 80;
+          // Get latest body weight from storage
+          const bwHistory = storage.get("bodyWeight",[]);
+          const bwSorted = [...bwHistory].sort((a,b)=>new Date(b.date)-new Date(a.date));
+          const bw = bwSorted.length > 0 ? Number(bwSorted[0].weight) : 80;
           const goalP = Math.round(bw*1.9); // 1.6-2.2g/kg → środek ~1.9
           const goalC = Math.round(goalKcal*0.5/4); // 50% kcal / 4 kcal/g
           const goalFat = Math.round(goalKcal*0.28/9); // 28% kcal / 9 kcal/g
@@ -1465,7 +1469,9 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
         const wF=wMeals.reduce((s,m)=>s+(m.fat||0),0);
         const wKcal=wMeals.reduce((s,m)=>s+(m.kcal||0),0);
         if(wKcal===0) return null;
-        const bw=settings?.weight||80;
+        const bwHist2 = storage.get("bodyWeight",[]);
+        const bwLast = [...bwHist2].sort((a,b)=>new Date(b.date)-new Date(a.date));
+        const bw = bwLast.length > 0 ? Number(bwLast[0].weight) : 80;
         const goalPweek=Math.round(bw*1.9)*7;
         return (
           <div className="card" style={{marginBottom:8}}>
