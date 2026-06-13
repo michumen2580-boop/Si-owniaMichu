@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.5.0";
+const APP_VERSION = "4.5.1";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1140,7 +1140,7 @@ function CardioView({onBack,saveDay,todayStr}) {
 }
 
 // ── SCREEN: DIETA ─────────────────────────────────────────────────────────────
-function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnabled}) {
+function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnabled,settings}) {
   const [meals,setMeals]       = useState(()=>storage.get("meals",[]));
   const [goalKcal,setGoalKcal] = useState(()=>storage.get("goalKcal",2200));
   const [tdee,setTdee]         = useState(()=>storage.get("tdee",2500));
@@ -1270,7 +1270,7 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
           const tP=todayMeals.reduce((s,m)=>s+(m.protein||0),0);
           const tC=todayMeals.reduce((s,m)=>s+(m.carbs||0),0);
           const tF=todayMeals.reduce((s,m)=>s+(m.fat||0),0);
-          const bw = settings?.weight||80;
+          const bw = (settings && settings.weight) ? Number(settings.weight) : 80;
           const goalP = Math.round(bw*1.9); // 1.6-2.2g/kg → środek ~1.9
           const goalC = Math.round(goalKcal*0.5/4); // 50% kcal / 4 kcal/g
           const goalFat = Math.round(goalKcal*0.28/9); // 28% kcal / 9 kcal/g
@@ -1668,14 +1668,14 @@ function ScreenCalendar({history,exerciseDB={},dayLogs,workoutDates,weeklyGoals,
   // Series per muscle for month
   const monthStr = `${y}-${String(m+1).padStart(2,"0")}`;
   const monthTotals = {push:0,pull:0,fbw:0};
-  history.filter(e=>e.date.startsWith(monthStr)).forEach(e=>{ if(monthTotals[e.type]!==undefined) monthTotals[e.type]+=(e.sets||3); });
+  history.filter(e=>e.date.startsWith(monthStr)).forEach(e=>{ if(monthTotals[e.type]!==undefined) monthTotals[e.type]+=(e.sets||0); });
 
   // Weekly muscle series
   const now2=new Date(); const dow=(now2.getDay()+6)%7;
   const wkStart=new Date(now2); wkStart.setDate(now2.getDate()-dow); wkStart.setHours(0,0,0,0);
   const wkDays=Array.from({length:7},(_,i)=>{ const d=new Date(wkStart); d.setDate(wkStart.getDate()+i); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; });
   const muscleSets={};
-  history.filter(e=>wkDays.includes(e.date)).forEach(e=>{ const mu=getMuscle(e.exercise, exerciseDB); if(mu) muscleSets[mu]=(muscleSets[mu]||0)+(Number(e.sets)||3); });
+  history.filter(e=>wkDays.includes(e.date)).forEach(e=>{ const mu=getMuscle(e.exercise, exerciseDB); if(mu) muscleSets[mu]=(muscleSets[mu]||0)+(Number(e.sets)||0); });
   const wStart2=wkStart.toLocaleDateString("pl-PL",{day:"numeric",month:"short"});
   const wEnd2=new Date(wkStart); wEnd2.setDate(wkStart.getDate()+6);
   const [editGoals,setEditGoals]=useState(false);
@@ -1760,7 +1760,7 @@ function ScreenCalendar({history,exerciseDB={},dayLogs,workoutDates,weeklyGoals,
               {entries.length>0&&<><div style={{fontSize:11,textTransform:"uppercase",letterSpacing:1.5,color:"var(--muted)",fontWeight:600,marginBottom:8}}>Ćwiczenia</div>
                 {entries.map((e,i)=>(
                   <div key={i} className="ex-row">
-                    <div><div className="ex-name">{e.exercise}</div><div style={{fontSize:10,color:"var(--muted)",marginTop:1}}>{e.sets||3}×</div></div>
+                    <div><div className="ex-name">{e.exercise}</div><div style={{fontSize:10,color:"var(--muted)",marginTop:1}}>{e.sets||0}×</div></div>
                     <span className="ex-wt" style={{color:col}}>{e.weight} <span style={{fontSize:12}}>kg</span></span>
                   </div>
                 ))}</>}
@@ -1943,7 +1943,7 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
               const prev=arr[i+1]; const diff=prev?e.weight-prev.weight:0;
               return (
                 <div key={i} className="ex-row">
-                  <div><div className="ex-name">{fmt(e.date)}</div><div style={{fontSize:10,color:"var(--muted)",marginTop:1}}>{e.type?.toUpperCase()} · {e.sets||3}×</div></div>
+                  <div><div className="ex-name">{fmt(e.date)}</div><div style={{fontSize:10,color:"var(--muted)",marginTop:1}}>{e.type?.toUpperCase()} · {e.sets||0}×</div></div>
                   <div style={{display:"flex",alignItems:"center",gap:8}}>
                     {diff!==0&&<span style={{fontSize:11,color:diff>0?"#22c55e":"#ef4444"}}>{diff>0?"▲":"▼"}{Math.abs(diff)}</span>}
                     <span className="ex-wt" style={{color:col}}>{e.weight} <span style={{fontSize:12}}>kg</span></span>
