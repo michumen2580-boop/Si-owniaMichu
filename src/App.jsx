@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.5.7";
+const APP_VERSION = "4.5.8";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -266,7 +266,7 @@ const Ic = ({n,s=20,c="currentColor"}) => {
 // ── MAIN APP ──────────────────────────────────────────────────────────────────
 export default function App() {
   const [tab,  setTab]  = useState("today");
-  const [settings, setSettings] = useState(()=>storage.get("appSettings",{vibration:true,darkMode:true,notifications:false}));
+  const [settings, setSettings] = useState(()=>storage.get("appSettings",{vibration:true,darkMode:true,notifications:false,stepGoal:10000,kcalGoal:1000}));
   const [weeklyGoals, setWeeklyGoals] = useState(()=>storage.get("weeklyGoals",{klata:9,plecy:12,barki:9,biceps:9,triceps:6,nogi:6}));
   // workoutTemplates: which exercise IDs are enabled for each training type
   // null = use defaults (all exercises), array = custom selection
@@ -430,6 +430,26 @@ function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,
             </div>
           </div>
         ))}
+        <div style={{marginTop:16,marginBottom:8,fontSize:13,fontWeight:700,color:"var(--muted2)",letterSpacing:.5}}>CELE AKTYWNOŚCI / DZIEŃ</div>
+        {[
+          {k:"stepGoal", e:"👟", l:"Cel kroków", min:1000, step:1000, unit:"kroków"},
+          {k:"kcalGoal", e:"🔥", l:"Cel kcal aktywnych", min:100, step:100, unit:"kcal"},
+        ].map(({k,e,l,min,step,unit})=>{
+          const val = settings[k]||(k==="stepGoal"?10000:1000);
+          return (
+            <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid var(--border)"}}>
+              <div>
+                <div style={{fontSize:14,fontWeight:600}}>{e} {l}</div>
+                <div style={{fontSize:11,color:"var(--muted)"}}>{val.toLocaleString()} {unit}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <button onClick={()=>setSettings(p=>({...p,[k]:Math.max(min,val-step)}))} style={{width:34,height:34,borderRadius:10,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>−</button>
+                <span style={{fontFamily:"'Bebas Neue'",fontSize:20,minWidth:50,textAlign:"center"}}>{val>=1000?val/1000+"k":val}</span>
+                <button onClick={()=>setSettings(p=>({...p,[k]:val+step}))} style={{width:34,height:34,borderRadius:10,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:20,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center"}}>+</button>
+              </div>
+            </div>
+          );
+        })}
         <div style={{marginTop:16,marginBottom:8,fontSize:13,fontWeight:700,color:"var(--muted2)",letterSpacing:.5}}>CELE SERII / TYDZIEŃ</div>
         {MUSCLES.map(m=>{
           const val=weeklyGoals[m]||9;
@@ -533,7 +553,7 @@ function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,
 }
 
 // ── SCREEN: DZIŚ ──────────────────────────────────────────────────────────────
-function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onSettings}) {
+function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onSettings,settings}) {
   const [steps,setSteps]     = useState(todayLog.steps||"");
   const [kcal,setKcal]       = useState(todayLog.calories||"");
   const now = new Date();
@@ -591,7 +611,8 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
       <div className="slabel">Aktywność z zegarka</div>
       <div className="card">
         {(()=>{
-          const STEP_GOAL = 10000;
+          const STEP_GOAL = settings?.stepGoal||10000;
+          const KCAL_GOAL = settings?.kcalGoal||1000;
           const todaySteps = todayLog.steps||0;
           const pct = Math.min(100, Math.round((todaySteps/STEP_GOAL)*100));
           const over = todaySteps >= STEP_GOAL;
@@ -618,7 +639,8 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
         })()}
         {(()=>{
           // Tygodniowy bilans kroków (pon–nd)
-          const STEP_GOAL = 10000;
+          const STEP_GOAL = settings?.stepGoal||10000;
+          const KCAL_GOAL_W = settings?.kcalGoal||1000;
           const now = new Date();
           const dow = now.getDay();
           const mondayOffset = dow===0?-6:1-dow;
@@ -638,7 +660,7 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
             <div style={{marginBottom:12,paddingBottom:12,borderBottom:"1px solid var(--border)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{fontSize:12,fontWeight:700,color:"var(--muted2)"}}>👟 Kroki – tydzień</div>
-                <div style={{fontSize:13,fontWeight:700}}>{totalWeek.toLocaleString()} / {(STEP_GOAL*7).toLocaleString()}</div>
+                <div style={{fontSize:13,fontWeight:700}}>{totalWeek.toLocaleString()} / {(STEP_GOAL*7).toLocaleString()} kroków</div>
               </div>
               <div style={{display:"flex",alignItems:"flex-end",gap:4,height:70,marginBottom:2}}>
                 {weekSteps.map((d,i)=>{
