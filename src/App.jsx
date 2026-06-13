@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.5.3";
+const APP_VERSION = "4.5.5";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -342,16 +342,35 @@ export default function App() {
 
   const todayStr = today();
   const saveDay  = useCallback((data)=>{
-    setDayLogs(p=>({...p,[todayStr]:{...p[todayStr],...data}}));
+    setDayLogs(p=>{
+      const prev = p[todayStr]||{};
+      // Accumulate workoutTypes as array (support multiple workouts per day)
+      let workoutTypes = prev.workoutTypes ? [...prev.workoutTypes] : (prev.workoutType ? [prev.workoutType] : []);
+      if(data.workoutType && !workoutTypes.includes(data.workoutType)) {
+        workoutTypes = [...workoutTypes, data.workoutType];
+      }
+      return {...p,[todayStr]:{...prev,...data, workoutTypes, workoutType: workoutTypes[workoutTypes.length-1]}};
+    });
   },[todayStr]);
 
   const todayLog = dayLogs[todayStr]||{};
   const workoutDates = {};
-  history.forEach(e=>{ if(!workoutDates[e.date]) workoutDates[e.date]=e.type; });
-  Object.entries(dayLogs).forEach(([d,l])=>{ if(l.workoutType&&!workoutDates[d]) workoutDates[d]=l.workoutType; });
+  // Build from exerciseDB history - collect all types per date
+  history.forEach(e=>{
+    if(!workoutDates[e.date]) workoutDates[e.date]=[e.type];
+    else if(!workoutDates[e.date].includes(e.type)) workoutDates[e.date]=[...workoutDates[e.date],e.type];
+  });
+  // Merge with dayLogs
+  Object.entries(dayLogs).forEach(([d,l])=>{
+    const types = l.workoutTypes || (l.workoutType ? [l.workoutType] : []);
+    if(types.length) {
+      if(!workoutDates[d]) workoutDates[d]=types;
+      else workoutDates[d]=[...new Set([...workoutDates[d],...types])];
+    }
+  });
 
-  const last7 = Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-6+i); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; return !!(dayLogs[ds]?.workoutType||workoutDates[ds]); });
-  const streak = (()=>{ let s=0,d=new Date(); for(let i=0;i<30;i++){ const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; if(dayLogs[ds]?.workoutType||workoutDates[ds]) s++; else if(i>0) break; d.setDate(d.getDate()-1); } return s; })();
+  const last7 = Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-6+i); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; return !!(dayLogs[ds]?.workoutType||dayLogs[ds]?.workoutTypes?.length||(workoutDates[ds]&&workoutDates[ds].length>0)); });
+  const streak = (()=>{ let s=0,d=new Date(); for(let i=0;i<30;i++){ const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; if(dayLogs[ds]?.workoutType||dayLogs[ds]?.workoutTypes?.length||(workoutDates[ds]&&workoutDates[ds].length>0)) s++; else if(i>0) break; d.setDate(d.getDate()-1); } return s; })();
 
   const aiActive = !!(aiEnabled && geminiKey.trim());
   const sharedProps = {history,exerciseDB,setExerciseDB,dayLogs,setDayLogs,saveDay,todayStr,todayLog,settings,customExercises,setCustomExercises,hiddenExercises,setHiddenExercises,weeklyGoals,setWeeklyGoals,workoutDates,workoutTemplates,setWorkoutTemplates,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnabled};
@@ -910,6 +929,7 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
   });
   const [done,      setDone]      = useState({});
   const [startTime]               = useState(Date.now());
+  const [sessionId]               = useState(()=>Date.now()); // unique ID per session
   const [elapsed,   setElapsed]   = useState(0);
   const [note,      setNote]      = useState("");
   const [finished,  setFinished]  = useState(false);
@@ -970,7 +990,8 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
         return {
           date: todayStr, type, exercise: ex.name,
           weight: parseFloat(weights[key]) || 0,
-          sets: completedSets
+          sets: completedSets,
+          sessionId
         };
       });
     if(entries.length) {
@@ -983,12 +1004,12 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
             // Add this training type if not already listed
             next[e.exercise] = {...next[e.exercise], trainings:[...(next[e.exercise].trainings||[]), e.type]};
           }
-          // Remove existing entry for same date+type, add new one (no duplicates)
+          // Remove existing entry for same sessionId (re-save same session), keep others
           next[e.exercise] = {
             ...next[e.exercise],
             history: [
-              ...next[e.exercise].history.filter(h=>!(h.date===e.date&&h.type===e.type)),
-              {date:e.date, type:e.type, weight:e.weight, sets:e.sets}
+              ...next[e.exercise].history.filter(h=>!(h.sessionId && h.sessionId===e.sessionId)),
+              {date:e.date, type:e.type, weight:e.weight, sets:e.sets, sessionId:e.sessionId}
             ].sort((a,b)=>a.date>b.date?1:-1)
           };
         });
@@ -1669,7 +1690,13 @@ function ScreenCalendar({history,exerciseDB={},dayLogs,workoutDates,weeklyGoals,
   const first = firstDayOfWeek(y,m);
   const cells = Array(first).fill(null).concat(Array.from({length:days},(_,i)=>i+1));
   const ds = d=>`${y}-${String(m+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-  const getDayType = d=>workoutDates[ds(d)]||(dayLogs[ds(d)]?.type)||null;
+  const getDayTypes = d=>{
+    const types = workoutDates[ds(d)];
+    if(types && Array.isArray(types)) return types;
+    if(types) return [types];
+    const logType = dayLogs[ds(d)]?.type;
+    return logType ? [logType] : [];
+  };
 
   // Series per muscle for month
   const monthStr = `${y}-${String(m+1).padStart(2,"0")}`;
@@ -1707,12 +1734,20 @@ function ScreenCalendar({history,exerciseDB={},dayLogs,workoutDates,weeklyGoals,
           {DAYS_PL.map(d=><div key={d} style={{textAlign:"center",fontSize:10,color:"var(--muted)",fontWeight:600,padding:"4px 0 8px",letterSpacing:.5}}>{d}</div>)}
           {cells.map((d,i)=>{
             if(!d) return <div key={`e${i}`} style={{aspectRatio:1}}/>;
-            const tp=getDayType(d); const col=tp?TYPE_COLOR[tp]||"#e8d5b0":null;
+            const tps=getDayTypes(d);
+            const primaryCol = tps.length>0 ? (TYPE_COLOR[tps[0]]||"#e8d5b0") : null;
             const isT=ds(d)===todayStr;
+            const hasCardio = tps.includes("cardio");
+            const hasStrength = tps.some(t=>["push","pull","fbw"].includes(t));
+            // Background: primary type color
+            const bgCol = primaryCol ? primaryCol+"33" : "var(--card2)";
             return (
-              <div key={d} className="cal-cell" style={{background:col?col+"33":"var(--card2)",color:col||"var(--muted)",fontWeight:isT?700:400,boxShadow:isT?"0 0 0 1.5px var(--text)":"none"}} onClick={()=>setSelDay(d)}>
+              <div key={d} className="cal-cell" style={{background:bgCol,color:primaryCol||"var(--muted)",fontWeight:isT?700:400,boxShadow:isT?"0 0 0 1.5px var(--text)":"none"}} onClick={()=>setSelDay(d)}>
                 {d}
-                {col&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:4,height:4,borderRadius:"50%",background:col}}/>}
+                {tps.length===1&&primaryCol&&<div style={{position:"absolute",bottom:3,left:"50%",transform:"translateX(-50%)",width:4,height:4,borderRadius:"50%",background:primaryCol}}/>}
+                {tps.length>1&&<div style={{position:"absolute",bottom:2,left:"50%",transform:"translateX(-50%)",display:"flex",gap:2}}>
+                  {tps.slice(0,2).map(t=><div key={t} style={{width:4,height:4,borderRadius:"50%",background:TYPE_COLOR[t]||"#e8d5b0"}}/>)}
+                </div>}
               </div>
             );
           })}
@@ -1753,7 +1788,8 @@ function ScreenCalendar({history,exerciseDB={},dayLogs,workoutDates,weeklyGoals,
         const dayStr=ds(selDay);
         const entries=history.filter(e=>e.date===dayStr);
         const log=dayLogs[dayStr]||{};
-        const tp=getDayType(selDay);
+        const selTypes=getDayTypes(selDay);
+        const tp=selTypes[0]||null;
         const col=tp?TYPE_COLOR[tp]||"#e8d5b0":"var(--muted)";
         return (
           <div className="modal-bg" onClick={()=>setSelDay(null)}>
