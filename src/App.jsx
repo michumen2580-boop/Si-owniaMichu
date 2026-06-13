@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.5.6";
+const APP_VERSION = "4.5.7";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -632,27 +632,56 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
           const totalWeek = weekSteps.reduce((s,d)=>s+d.steps,0);
           const maxSteps = Math.max(...weekSteps.map(d=>d.steps), STEP_GOAL);
           if(totalWeek===0) return null;
+          const weekKcal = week7.map(ds=>({ds, kcal:dayLogs[ds]?.calories||0}));
+          const totalKcalWeek = weekKcal.reduce((s,d)=>s+d.kcal,0);
           return (
             <div style={{marginBottom:12,paddingBottom:12,borderBottom:"1px solid var(--border)"}}>
               <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
                 <div style={{fontSize:12,fontWeight:700,color:"var(--muted2)"}}>👟 Kroki – tydzień</div>
                 <div style={{fontSize:13,fontWeight:700}}>{totalWeek.toLocaleString()} / {(STEP_GOAL*7).toLocaleString()}</div>
               </div>
-              <div style={{display:"flex",alignItems:"flex-end",gap:4,height:50,marginBottom:4}}>
+              <div style={{display:"flex",alignItems:"flex-end",gap:4,height:70,marginBottom:2}}>
                 {weekSteps.map((d,i)=>{
-                  const h=Math.max(3,Math.round((d.steps/maxSteps)*46));
+                  const h=d.steps>0?Math.max(8,Math.round((d.steps/maxSteps)*62)):0;
                   const isT=d.ds===todayStr;
                   const ok=d.steps>=STEP_GOAL;
                   return (
                     <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                      <div style={{width:"100%",height:h,borderRadius:3,background:isT?(ok?"#22c55e":"#eab308"):ok?"#22c55e44":"var(--border)",border:isT?`1px solid ${ok?"#22c55e":"#eab308"}`:"none"}}/>
+                      <div style={{fontSize:8,color:isT?"var(--text)":"var(--muted)",height:14,display:"flex",alignItems:"flex-end",textAlign:"center",lineHeight:1}}>
+                        {d.steps>0?(d.steps>=1000?Math.round(d.steps/1000)+"k":d.steps):""}
+                      </div>
+                      <div style={{width:"100%",height:h,borderRadius:3,background:h===0?"transparent":isT?(ok?"#22c55e":"#eab308"):ok?"#22c55e44":"#eab30833",border:h>0&&isT?`1px solid ${ok?"#22c55e":"#eab308"}`:"none"}}/>
                     </div>
                   );
                 })}
               </div>
-              <div style={{display:"flex",gap:4}}>
+              <div style={{display:"flex",gap:4,marginBottom:10}}>
                 {weekSteps.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:d.ds===todayStr?"var(--text)":"var(--muted)",fontWeight:d.ds===todayStr?700:400}}>{DAY_LABELS[i]}</div>)}
               </div>
+              {totalKcalWeek>0&&<>
+                <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:6}}>
+                  <div style={{fontSize:12,fontWeight:700,color:"var(--muted2)"}}>🔥 Kcal aktywne – tydzień</div>
+                  <div style={{fontSize:13,fontWeight:700,color:"#ef4444"}}>{totalKcalWeek.toLocaleString()} kcal</div>
+                </div>
+                <div style={{display:"flex",alignItems:"flex-end",gap:4,height:50,marginBottom:2}}>
+                  {weekKcal.map((d,i)=>{
+                    const maxK=Math.max(...weekKcal.map(x=>x.kcal),1);
+                    const h=d.kcal>0?Math.max(8,Math.round((d.kcal/maxK)*44)):0;
+                    const isT=d.ds===todayStr;
+                    return (
+                      <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                        <div style={{fontSize:8,color:isT?"var(--text)":"var(--muted)",height:12,display:"flex",alignItems:"flex-end",textAlign:"center"}}>
+                          {d.kcal>0?d.kcal:""}
+                        </div>
+                        <div style={{width:"100%",height:h,borderRadius:3,background:h===0?"transparent":isT?"#ef4444":"#ef444433",border:h>0&&isT?"1px solid #ef4444":"none"}}/>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div style={{display:"flex",gap:4}}>
+                  {weekKcal.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:d.ds===todayStr?"var(--text)":"var(--muted)",fontWeight:d.ds===todayStr?700:400}}>{DAY_LABELS[i]}</div>)}
+                </div>
+              </>}
             </div>
           );
         })()}
