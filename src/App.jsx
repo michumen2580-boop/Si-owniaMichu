@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.4.1";
+const APP_VERSION = "4.5.0";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1266,13 +1266,45 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
           </div>
         </div>
         <div style={{background:"var(--border)",borderRadius:6,height:8,marginBottom:10}}><div style={{height:"100%",borderRadius:6,background:totalKcal>goalKcal?"#ef4444":"#22c55e",width:`${pct}%`,transition:"width .3s"}}/></div>
-        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6}}>
-          {[["🥩 B",todayMeals.reduce((s,m)=>s+(m.protein||0),0),"g","#ef4444"],["🍞 W",todayMeals.reduce((s,m)=>s+(m.carbs||0),0),"g","#eab308"],["🧈 T",todayMeals.reduce((s,m)=>s+(m.fat||0),0),"g","#3b82f6"]].map(([l,v,u,c])=>(
-            <div key={l} style={{textAlign:"center",background:"var(--card2)",borderRadius:10,padding:"8px 4px"}}>
-              <div style={{fontFamily:"'Bebas Neue'",fontSize:20,color:c}}>{v}{u}</div><div style={{fontSize:10,color:"var(--muted)"}}>{l}</div>
+        {(()=>{
+          const tP=todayMeals.reduce((s,m)=>s+(m.protein||0),0);
+          const tC=todayMeals.reduce((s,m)=>s+(m.carbs||0),0);
+          const tF=todayMeals.reduce((s,m)=>s+(m.fat||0),0);
+          const bw = settings?.weight||80;
+          const goalP = Math.round(bw*1.9); // 1.6-2.2g/kg → środek ~1.9
+          const goalC = Math.round(goalKcal*0.5/4); // 50% kcal / 4 kcal/g
+          const goalFat = Math.round(goalKcal*0.28/9); // 28% kcal / 9 kcal/g
+          const bars = [
+            {l:"🥩 Białko",v:tP,g:goalP,u:"g",c:"#ef4444"},
+            {l:"🍞 Węgle",v:tC,g:goalC,u:"g",c:"#eab308"},
+            {l:"🧈 Tłuszcze",v:tF,g:goalFat,u:"g",c:"#3b82f6"},
+          ];
+          return (
+            <div style={{marginTop:6}}>
+              {bars.map(({l,v,g,u,c})=>{
+                const pct=Math.min(100,Math.round((v/g)*100));
+                const over=v>g;
+                return (
+                  <div key={l} style={{marginBottom:8}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:3}}>
+                      <span style={{fontSize:12,color:"var(--muted2)",fontWeight:600}}>{l}</span>
+                      <span style={{fontSize:12}}>
+                        <strong style={{color:over?"#ef4444":c}}>{v}{u}</strong>
+                        <span style={{color:"var(--muted)"}}> / {g}{u}</span>
+                      </span>
+                    </div>
+                    <div style={{background:"var(--border)",borderRadius:4,height:7}}>
+                      <div style={{height:"100%",borderRadius:4,background:over?"#ef4444":c,width:`${pct}%`,transition:"width .3s"}}/>
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{fontSize:10,color:"var(--muted)",marginTop:2,textAlign:"right"}}>
+                cel białka: {Math.round(bw*1.6)}–{Math.round(bw*2.2)}g/dzień ({bw}kg × 1.6–2.2g)
+              </div>
             </div>
-          ))}
-        </div>
+          );
+        })()}
       </div>
       {/* DZIENNY PASEK POSTĘPU */}
       {(()=>{
@@ -1416,6 +1448,50 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
         );
       })()}
 
+      {/* TYGODNIOWY BILANS MAKRO */}
+      {(()=>{
+        const now = new Date();
+        const dow = now.getDay();
+        const mondayOffset = dow === 0 ? -6 : 1 - dow;
+        const monday = new Date(now);
+        monday.setDate(now.getDate() + mondayOffset);
+        const week7 = Array.from({length:7},(_,i)=>{
+          const d=new Date(monday); d.setDate(monday.getDate()+i);
+          return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+        });
+        const wMeals = meals.filter(m=>week7.includes(m.date));
+        const wP=wMeals.reduce((s,m)=>s+(m.protein||0),0);
+        const wC=wMeals.reduce((s,m)=>s+(m.carbs||0),0);
+        const wF=wMeals.reduce((s,m)=>s+(m.fat||0),0);
+        const wKcal=wMeals.reduce((s,m)=>s+(m.kcal||0),0);
+        if(wKcal===0) return null;
+        const bw=settings?.weight||80;
+        const goalPweek=Math.round(bw*1.9)*7;
+        return (
+          <div className="card" style={{marginBottom:8}}>
+            <div className="ctitle">Makro – ten tydzień</div>
+            {[
+              {l:"🥩 Białko",v:wP,g:goalPweek,c:"#ef4444",unit:"g"},
+              {l:"🍞 Węgle",v:wC,g:Math.round(goalKcal*0.5/4)*7,c:"#eab308",unit:"g"},
+              {l:"🧈 Tłuszcze",v:wF,g:Math.round(goalKcal*0.28/9)*7,c:"#3b82f6",unit:"g"},
+            ].map(({l,v,g,c,unit})=>{
+              const pct=Math.min(100,Math.round((v/g)*100));
+              const over=v>g;
+              return (
+                <div key={l} style={{marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",marginBottom:3}}>
+                    <span style={{fontSize:12,color:"var(--muted2)",fontWeight:600}}>{l}</span>
+                    <span style={{fontSize:12}}><strong style={{color:over?"#ef4444":c}}>{v}{unit}</strong><span style={{color:"var(--muted)"}}> / {g}{unit}</span></span>
+                  </div>
+                  <div style={{background:"var(--border)",borderRadius:4,height:7}}>
+                    <div style={{height:"100%",borderRadius:4,background:over?"#ef4444":c,width:`${pct}%`,transition:"width .3s"}}/>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        );
+      })()}
       <div style={{margin:"0 16px 12px"}}>
         <button onClick={()=>setShowAdd(s=>!s)} className="btn btn-red" style={{background:showAdd?"#333":"#ef4444"}}>{showAdd?"✕ Anuluj":"+ Dodaj posiłek"}</button>
       </div>
@@ -1554,6 +1630,21 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
               <span style={{fontFamily:"'Bebas Neue'",fontSize:20,color:dk>goalKcal?"#ef4444":"#22c55e"}}>{dk} kcal</span>
             </div>
             {dm.map(m=><div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderTop:"1px solid var(--border)"}}><span style={{fontSize:12,color:"var(--muted2)"}}>{m.name}</span><span style={{fontSize:12,color:"var(--muted)"}}>{m.kcal} kcal</span></div>)}
+            {(()=>{
+              const dp=dm.reduce((s,m)=>s+(m.protein||0),0);
+              const dc=dm.reduce((s,m)=>s+(m.carbs||0),0);
+              const df=dm.reduce((s,m)=>s+(m.fat||0),0);
+              return (
+                <div style={{display:"flex",gap:6,marginTop:8,paddingTop:6,borderTop:"1px solid var(--border)"}}>
+                  {[["🥩",dp,"#ef4444"],["🍞",dc,"#eab308"],["🧈",df,"#3b82f6"]].map(([e,v,c])=>(
+                    <div key={e} style={{flex:1,textAlign:"center",background:"var(--card2)",borderRadius:8,padding:"4px 2px"}}>
+                      <div style={{fontSize:13,fontWeight:700,color:c}}>{v}g</div>
+                      <div style={{fontSize:10,color:"var(--muted)"}}>{e}</div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         )}):<div style={{textAlign:"center",padding:24,color:"var(--muted)",fontSize:13}}>Brak historii</div>
       )}
