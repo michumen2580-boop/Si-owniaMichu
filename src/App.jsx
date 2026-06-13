@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.5.5";
+const APP_VERSION = "4.5.6";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -590,10 +590,72 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
         </div></>}
       <div className="slabel">Aktywność z zegarka</div>
       <div className="card">
-        {todayLog.steps&&<div style={{display:"flex",gap:24,marginBottom:12}}>
-          <div><div style={{fontFamily:"'Bebas Neue'",fontSize:26}}>{(todayLog.steps||0).toLocaleString()}</div><div style={{fontSize:11,color:"var(--muted)"}}>kroków</div></div>
-          <div><div style={{fontFamily:"'Bebas Neue'",fontSize:26,color:"#ef4444"}}>{todayLog.calories||0}</div><div style={{fontSize:11,color:"var(--muted)"}}>kcal aktywnych</div></div>
-        </div>}
+        {(()=>{
+          const STEP_GOAL = 10000;
+          const todaySteps = todayLog.steps||0;
+          const pct = Math.min(100, Math.round((todaySteps/STEP_GOAL)*100));
+          const over = todaySteps >= STEP_GOAL;
+          return todaySteps>0?(
+            <div style={{marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-end",marginBottom:6}}>
+                <div>
+                  <div style={{fontFamily:"'Bebas Neue'",fontSize:32,color:over?"#22c55e":"var(--text)",lineHeight:1}}>{todaySteps.toLocaleString()}</div>
+                  <div style={{fontSize:11,color:"var(--muted)"}}>kroków · cel: {STEP_GOAL.toLocaleString()}</div>
+                </div>
+                <div style={{textAlign:"right"}}>
+                  <div style={{fontFamily:"'Bebas Neue'",fontSize:24,color:over?"#22c55e":"#eab308"}}>{todayLog.calories||0}</div>
+                  <div style={{fontSize:11,color:"var(--muted)"}}>kcal aktywnych</div>
+                </div>
+              </div>
+              <div style={{background:"var(--border)",borderRadius:8,height:10,overflow:"hidden"}}>
+                <div style={{height:"100%",borderRadius:8,background:over?"#22c55e":"#eab308",width:`${pct}%`,transition:"width .4s"}}/>
+              </div>
+              <div style={{fontSize:11,color:"var(--muted)",marginTop:4,textAlign:"center"}}>
+                {over?`✅ Cel osiągnięty! +${(todaySteps-STEP_GOAL).toLocaleString()} kroków`:`${(STEP_GOAL-todaySteps).toLocaleString()} kroków do celu`}
+              </div>
+            </div>
+          ):null;
+        })()}
+        {(()=>{
+          // Tygodniowy bilans kroków (pon–nd)
+          const STEP_GOAL = 10000;
+          const now = new Date();
+          const dow = now.getDay();
+          const mondayOffset = dow===0?-6:1-dow;
+          const monday = new Date(now); monday.setDate(now.getDate()+mondayOffset);
+          const week7 = Array.from({length:7},(_,i)=>{
+            const d=new Date(monday); d.setDate(monday.getDate()+i);
+            return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+          });
+          const DAY_LABELS = ["Pn","Wt","Śr","Cz","Pt","Sb","Nd"];
+          const weekSteps = week7.map(ds=>({ds, steps:dayLogs[ds]?.steps||0}));
+          const totalWeek = weekSteps.reduce((s,d)=>s+d.steps,0);
+          const maxSteps = Math.max(...weekSteps.map(d=>d.steps), STEP_GOAL);
+          if(totalWeek===0) return null;
+          return (
+            <div style={{marginBottom:12,paddingBottom:12,borderBottom:"1px solid var(--border)"}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <div style={{fontSize:12,fontWeight:700,color:"var(--muted2)"}}>👟 Kroki – tydzień</div>
+                <div style={{fontSize:13,fontWeight:700}}>{totalWeek.toLocaleString()} / {(STEP_GOAL*7).toLocaleString()}</div>
+              </div>
+              <div style={{display:"flex",alignItems:"flex-end",gap:4,height:50,marginBottom:4}}>
+                {weekSteps.map((d,i)=>{
+                  const h=Math.max(3,Math.round((d.steps/maxSteps)*46));
+                  const isT=d.ds===todayStr;
+                  const ok=d.steps>=STEP_GOAL;
+                  return (
+                    <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                      <div style={{width:"100%",height:h,borderRadius:3,background:isT?(ok?"#22c55e":"#eab308"):ok?"#22c55e44":"var(--border)",border:isT?`1px solid ${ok?"#22c55e":"#eab308"}`:"none"}}/>
+                    </div>
+                  );
+                })}
+              </div>
+              <div style={{display:"flex",gap:4}}>
+                {weekSteps.map((d,i)=><div key={i} style={{flex:1,textAlign:"center",fontSize:9,color:d.ds===todayStr?"var(--text)":"var(--muted)",fontWeight:d.ds===todayStr?700:400}}>{DAY_LABELS[i]}</div>)}
+              </div>
+            </div>
+          );
+        })()}
         <div style={{display:"flex",flexDirection:"column",gap:10}}>
           <div className="row"><span style={{fontSize:13,color:"var(--muted2)",width:100}}>👟 Kroki</span><input className="inp inp-r" type="number" placeholder="np. 8000" value={steps} onChange={e=>setSteps(e.target.value)}/></div>
           <div className="row"><span style={{fontSize:13,color:"var(--muted2)",width:100}}>🔥 Kcal aktywne</span><input className="inp inp-r" type="number" placeholder="np. 450" value={kcal} onChange={e=>setKcal(e.target.value)}/></div>
@@ -2103,15 +2165,30 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
 
       {activeTab==="week"&&(()=>{
         const getWS=d=>{const dt=new Date(d);dt.setDate(dt.getDate()-((dt.getDay()+6)%7));return dt.toISOString().slice(0,10);};
+        // Also collect cardio from dayLogs
         const wMap={};
-        history.forEach(e=>{const ws=getWS(e.date);if(!wMap[ws])wMap[ws]={push:new Set(),pull:new Set(),fbw:new Set()};if(wMap[ws][e.type])wMap[ws][e.type].add(e.date);});
+        history.forEach(e=>{
+          const ws=getWS(e.date);
+          if(!wMap[ws])wMap[ws]={push:new Set(),pull:new Set(),fbw:new Set(),cardio:new Set()};
+          if(wMap[ws][e.type]) wMap[ws][e.type].add(e.date);
+        });
+        // Add cardio from dayLogs
+        Object.entries(dayLogs).forEach(([d,l])=>{
+          const types = l.workoutTypes||(l.workoutType?[l.workoutType]:[]);
+          if(types.includes("cardio")) {
+            const ws=getWS(d);
+            if(!wMap[ws]) wMap[ws]={push:new Set(),pull:new Set(),fbw:new Set(),cardio:new Set()};
+            wMap[ws].cardio.add(d);
+          }
+        });
         const weeks=Object.entries(wMap).sort((a,b)=>a[0]>b[0]?-1:1).slice(0,8);
         return (
           <div className="card">
             <div className="ctitle">Podsumowanie tygodni</div>
             {!weeks.length&&<div style={{textAlign:"center",padding:20,color:"var(--muted)",fontSize:13}}>Brak danych</div>}
             {weeks.map(([ws,data])=>{
-              const pN=data.push?.size||0,lN=data.pull?.size||0,fN=data.fbw?.size||0,total=pN+lN+fN;
+              const pN=data.push?.size||0,lN=data.pull?.size||0,fN=data.fbw?.size||0,cN=data.cardio?.size||0;
+              const total=pN+lN+fN+cN;
               const we=new Date(ws); we.setDate(we.getDate()+6);
               return (
                 <div key={ws} style={{padding:"12px 0",borderBottom:"1px solid var(--border)"}}>
@@ -2120,10 +2197,10 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
                     <span style={{fontFamily:"'Bebas Neue'",fontSize:20,color:"#ef4444"}}>{total}x</span>
                   </div>
                   <div style={{display:"flex",gap:6}}>
-                    {[["PUSH",pN,"#ef4444"],["PULL",lN,"#3b82f6"],["FBW",fN,"#22c55e"]].map(([l,n,c])=>(
-                      <div key={l} style={{flex:1,textAlign:"center",background:n>0?c+"22":"var(--card2)",borderRadius:8,padding:"6px 4px",border:n>0?`1px solid ${c}44`:"none"}}>
+                    {[["PUSH",pN,"#ef4444"],["PULL",lN,"#3b82f6"],["FBW",fN,"#22c55e"],["CARDIO",cN,"#eab308"]].map(([l,n,c])=>(
+                      <div key={l} style={{flex:1,textAlign:"center",background:n>0?c+"22":"var(--card2)",borderRadius:8,padding:"6px 2px",border:n>0?`1px solid ${c}44`:"none"}}>
                         <div style={{fontFamily:"'Bebas Neue'",fontSize:18,color:n>0?c:"var(--muted)"}}>{n}x</div>
-                        <div style={{fontSize:9,color:"var(--muted)",letterSpacing:.5}}>{l}</div>
+                        <div style={{fontSize:8,color:"var(--muted)",letterSpacing:.3}}>{l}</div>
                       </div>
                     ))}
                   </div>
