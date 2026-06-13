@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.5.2";
+const APP_VERSION = "4.5.3";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1274,7 +1274,7 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
           // Get latest body weight from storage
           const bwHistory = storage.get("bodyWeight",[]);
           const bwSorted = [...bwHistory].sort((a,b)=>new Date(b.date)-new Date(a.date));
-          const bw = bwSorted.length > 0 ? Number(bwSorted[0].weight) : 80;
+          const bw = bwSorted.length > 0 ? Number(bwSorted[0].val) : 80;
           const goalP = Math.round(bw*1.9); // 1.6-2.2g/kg → środek ~1.9
           const goalC = Math.round(goalKcal*0.5/4); // 50% kcal / 4 kcal/g
           const goalFat = Math.round(goalKcal*0.28/9); // 28% kcal / 9 kcal/g
@@ -1471,7 +1471,7 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
         if(wKcal===0) return null;
         const bwHist2 = storage.get("bodyWeight",[]);
         const bwLast = [...bwHist2].sort((a,b)=>new Date(b.date)-new Date(a.date));
-        const bw = bwLast.length > 0 ? Number(bwLast[0].weight) : 80;
+        const bw = bwLast.length > 0 ? Number(bwLast[0].val) : 80;
         const goalPweek=Math.round(bw*1.9)*7;
         return (
           <div className="card" style={{marginBottom:8}}>
