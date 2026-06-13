@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.5.8";
+const APP_VERSION = "4.5.9";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -624,8 +624,8 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
                   <div style={{fontSize:11,color:"var(--muted)"}}>kroków · cel: {STEP_GOAL.toLocaleString()}</div>
                 </div>
                 <div style={{textAlign:"right"}}>
-                  <div style={{fontFamily:"'Bebas Neue'",fontSize:24,color:over?"#22c55e":"#eab308"}}>{todayLog.calories||0}</div>
-                  <div style={{fontSize:11,color:"var(--muted)"}}>kcal aktywnych</div>
+                  <div style={{fontFamily:"'Bebas Neue'",fontSize:24,color:(todayLog.calories||0)>=KCAL_GOAL?"#22c55e":"#ef4444"}}>{todayLog.calories||0}</div>
+                  <div style={{fontSize:11,color:"var(--muted)"}}>kcal · cel: {KCAL_GOAL}</div>
                 </div>
               </div>
               <div style={{background:"var(--border)",borderRadius:8,height:10,overflow:"hidden"}}>
@@ -685,17 +685,19 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
                   <div style={{fontSize:12,fontWeight:700,color:"var(--muted2)"}}>🔥 Kcal aktywne – tydzień</div>
                   <div style={{fontSize:13,fontWeight:700,color:"#ef4444"}}>{totalKcalWeek.toLocaleString()} kcal</div>
                 </div>
-                <div style={{display:"flex",alignItems:"flex-end",gap:4,height:50,marginBottom:2}}>
+                <div style={{display:"flex",alignItems:"flex-end",gap:4,height:70,marginBottom:2}}>
                   {weekKcal.map((d,i)=>{
-                    const maxK=Math.max(...weekKcal.map(x=>x.kcal),1);
-                    const h=d.kcal>0?Math.max(8,Math.round((d.kcal/maxK)*44)):0;
+                    const KCAL_GOAL = settings?.kcalGoal||1000;
+                    const maxK=Math.max(...weekKcal.map(x=>x.kcal),KCAL_GOAL);
+                    const h=d.kcal>0?Math.max(8,Math.round((d.kcal/maxK)*62)):0;
                     const isT=d.ds===todayStr;
+                    const ok=d.kcal>=KCAL_GOAL;
                     return (
                       <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
-                        <div style={{fontSize:8,color:isT?"var(--text)":"var(--muted)",height:12,display:"flex",alignItems:"flex-end",textAlign:"center"}}>
+                        <div style={{fontSize:8,color:isT?"var(--text)":"var(--muted)",height:14,display:"flex",alignItems:"flex-end",textAlign:"center"}}>
                           {d.kcal>0?d.kcal:""}
                         </div>
-                        <div style={{width:"100%",height:h,borderRadius:3,background:h===0?"transparent":isT?"#ef4444":"#ef444433",border:h>0&&isT?"1px solid #ef4444":"none"}}/>
+                        <div style={{width:"100%",height:h,borderRadius:3,background:h===0?"transparent":isT?(ok?"#22c55e":"#ef4444"):ok?"#22c55e44":"#ef444433",border:h>0&&isT?`1px solid ${ok?"#22c55e":"#ef4444"}`:"none"}}/>
                       </div>
                     );
                   })}
