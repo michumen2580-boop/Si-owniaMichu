@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.5.9";
+const APP_VERSION = "4.6.0";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -274,6 +274,9 @@ export default function App() {
   useEffect(()=>{ storage.set("workoutTemplates",workoutTemplates); },[workoutTemplates]);
 
   const [geminiKey,  setGeminiKey]  = useState(()=>storage.get("geminiKey",""));
+  const [tdee,       setTdee]       = useState(()=>storage.get("tdee",2500));
+  const [goalKcal,   setGoalKcal]   = useState(()=>storage.get("goalKcal",2200));
+  useEffect(()=>{ storage.set("tdee",tdee); },[tdee]);
   const [aiEnabled,  setAiEnabled]  = useState(()=>storage.get("aiEnabled",false));
   useEffect(()=>{ storage.set("geminiKey", geminiKey); },[geminiKey]);
   useEffect(()=>{ storage.set("aiEnabled", aiEnabled); },[aiEnabled]);
@@ -373,7 +376,7 @@ export default function App() {
   const streak = (()=>{ let s=0,d=new Date(); for(let i=0;i<30;i++){ const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; if(dayLogs[ds]?.workoutType||dayLogs[ds]?.workoutTypes?.length||(workoutDates[ds]&&workoutDates[ds].length>0)) s++; else if(i>0) break; d.setDate(d.getDate()-1); } return s; })();
 
   const aiActive = !!(aiEnabled && geminiKey.trim());
-  const sharedProps = {history,exerciseDB,setExerciseDB,dayLogs,setDayLogs,saveDay,todayStr,todayLog,settings,customExercises,setCustomExercises,hiddenExercises,setHiddenExercises,weeklyGoals,setWeeklyGoals,workoutDates,workoutTemplates,setWorkoutTemplates,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnabled};
+  const sharedProps = {history,exerciseDB,setExerciseDB,dayLogs,setDayLogs,saveDay,todayStr,todayLog,settings,setSettings,customExercises,setCustomExercises,hiddenExercises,setHiddenExercises,weeklyGoals,setWeeklyGoals,workoutDates,workoutTemplates,setWorkoutTemplates,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnabled,tdee,setTdee,goalKcal,setGoalKcal};
 
   return (
     <>
@@ -393,14 +396,14 @@ export default function App() {
             </button>
           ))}
         </nav>
-        {showSettings && <SettingsModal settings={settings} setSettings={setSettings} weeklyGoals={weeklyGoals} setWeeklyGoals={setWeeklyGoals} history={history} dayLogs={dayLogs} exerciseDB={exerciseDB} geminiKey={geminiKey} setGeminiKey={setGeminiKey} aiEnabled={aiEnabled} setAiEnabled={setAiEnabled} onClose={()=>setShowSettings(false)}/>}
+        {showSettings && <SettingsModal settings={settings} setSettings={setSettings} weeklyGoals={weeklyGoals} setWeeklyGoals={setWeeklyGoals} history={history} dayLogs={dayLogs} exerciseDB={exerciseDB} geminiKey={geminiKey} setGeminiKey={setGeminiKey} aiEnabled={aiEnabled} setAiEnabled={setAiEnabled} onClose={()=>setShowSettings(false)} tdee={tdee} setTdee={setTdee} goalKcal={goalKcal} setGoalKcal={setGoalKcal}/>}
       </div>
     </>
   );
 }
 
 // ── SETTINGS MODAL ────────────────────────────────────────────────────────────
-function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,dayLogs,exerciseDB={},geminiKey="",setGeminiKey,aiEnabled,setAiEnabled,onClose}) {
+function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,dayLogs,exerciseDB={},geminiKey="",setGeminiKey,aiEnabled,setAiEnabled,onClose,tdee,setTdee,goalKcal,setGoalKcal}) {
   const tog = k => setSettings(p=>({...p,[k]:!p[k]}));
   const [stab, setStab] = useState("general"); // settings tab
   const [keyInput, setKeyInput] = useState("");
@@ -414,9 +417,9 @@ function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,
         </div>
         {/* TAB SWITCHER */}
         <div style={{display:"flex",gap:6,marginBottom:16}}>
-          {[["general","⚙️ Ogólne"],["ai","🤖 AI"]].map(([id,label])=>(
+          {[["general","⚙️ Ogólne"],["tdee","🔢 Kalkulator"],["ai","🤖 AI"]].map(([id,label])=>(
             <button key={id} onClick={()=>setStab(id)}
-              style={{flex:1,padding:"8px 4px",borderRadius:10,border:`1.5px solid ${stab===id?"#ef4444":"var(--border)"}`,background:stab===id?"#ef444422":"var(--card2)",color:stab===id?"#ef4444":"var(--muted)",fontWeight:700,fontSize:12,cursor:"pointer"}}>
+              style={{flex:1,padding:"8px 4px",borderRadius:10,border:`1.5px solid ${stab===id?"#ef4444":"var(--border)"}`,background:stab===id?"#ef444422":"var(--card2)",color:stab===id?"#ef4444":"var(--muted)",fontWeight:700,fontSize:11,cursor:"pointer"}}>
               {label}
             </button>
           ))}
@@ -493,6 +496,95 @@ function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,
           <button className="btn btn-ghost" style={{width:"100%",color:"#ef4444",borderColor:"#ef444433"}} onClick={()=>{ if(confirm("Resetować wszystkie dane?")){ localStorage.clear(); window.location.reload(); } }}>🗑️ Resetuj dane</button>
         </div>
         </>}
+        {stab==="tdee" && (()=>{
+          const bwHist = storage.get("bodyWeight",[]);
+          const bwSorted = [...bwHist].sort((a,b)=>new Date(b.date)-new Date(a.date));
+          const currentWeight = bwSorted.length>0 ? Number(bwSorted[0].val) : 80;
+          const now7 = new Date();
+          const last7days = Array.from({length:7},(_,i)=>{ const d=new Date(now7); d.setDate(d.getDate()-i); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; });
+          const workoutsLast7 = [...new Set(history.filter(e=>last7days.includes(e.date)).map(e=>e.date))].length;
+          const cardioLast7 = last7days.filter(d=>{ const l=dayLogs[d]; return l&&(l.workoutTypes?.includes("cardio")||l.workoutType==="cardio"); }).length;
+          const avgSteps = Math.round(last7days.reduce((s,d)=>s+(dayLogs[d]?.steps||0),0)/7);
+          const [height, setHeight] = useState(()=>settings.height||188);
+          const [age,    setAge]    = useState(()=>settings.age||38);
+          const [gender, setGender] = useState(()=>settings.gender||"male");
+          const [goal,   setGoal]   = useState("cut");
+          const [result, setResult] = useState(null);
+
+          const calcTDEE = () => {
+            const bmr = gender==="male" ? 10*currentWeight+6.25*height-5*age+5 : 10*currentWeight+6.25*height-5*age-161;
+            const totalActive = workoutsLast7+cardioLast7;
+            const actMult = avgSteps<5000&&totalActive===0 ? 1.2 : avgSteps<7500&&totalActive<=1 ? 1.375 : avgSteps<10000&&totalActive<=3 ? 1.55 : 1.725;
+            const tdeeCalc = Math.round(bmr*actMult);
+            const goalKcalCalc = goal==="cut"?Math.round(tdeeCalc*0.8):goal==="bulk"?Math.round(tdeeCalc*1.1):tdeeCalc;
+            setResult({bmr:Math.round(bmr),tdee:tdeeCalc,goalKcal:goalKcalCalc,actMult,totalActive});
+          };
+
+          const applyResult = () => {
+            if(!result) return;
+            setTdee(result.tdee);
+            setGoalKcal(result.goalKcal);
+            setSettings(p=>({...p,height,age,gender}));
+          };
+
+          const actLabel = result?(result.actMult<=1.2?"🪑 Siedzący":result.actMult<=1.375?"🚶 Lekko aktywny":result.actMult<=1.55?"🏃 Umiarkowanie aktywny":"💪 Bardzo aktywny"):"";
+
+          return (
+            <div>
+              <div style={{fontSize:12,color:"var(--muted)",marginBottom:12,lineHeight:1.5}}>Oblicza TDEE na podstawie Twoich danych i aktywności z ostatnich 7 dni.</div>
+              <div style={{background:"var(--card2)",borderRadius:10,padding:"10px 12px",marginBottom:12}}>
+                <div style={{fontWeight:700,color:"var(--muted2)",marginBottom:8,fontSize:11,letterSpacing:.5}}>DANE Z APLIKACJI (ostatnie 7 dni)</div>
+                {[["⚖️ Waga",currentWeight+" kg"],["🏋️ Treningi siłowe",workoutsLast7+"x"],["🚴 Cardio",cardioLast7+"x"],["👟 Średnie kroki/dzień",avgSteps.toLocaleString()]].map(([l,v])=>(
+                  <div key={l} style={{display:"flex",justifyContent:"space-between",marginBottom:4,fontSize:12}}>
+                    <span style={{color:"var(--muted)"}}>{l}</span><strong>{v}</strong>
+                  </div>
+                ))}
+              </div>
+              {[{l:"📏 Wzrost (cm)",v:height,set:setHeight,min:140,max:220},{l:"🎂 Wiek",v:age,set:setAge,min:15,max:80}].map(({l,v,set,min,max})=>(
+                <div key={l} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid var(--border)"}}>
+                  <span style={{fontSize:13}}>{l}</span>
+                  <div style={{display:"flex",alignItems:"center",gap:10}}>
+                    <button onClick={()=>set(p=>Math.max(min,p-1))} style={{width:32,height:32,borderRadius:8,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:18,cursor:"pointer"}}>−</button>
+                    <span style={{fontFamily:"'Bebas Neue'",fontSize:22,minWidth:36,textAlign:"center"}}>{v}</span>
+                    <button onClick={()=>set(p=>Math.min(max,p+1))} style={{width:32,height:32,borderRadius:8,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:18,cursor:"pointer"}}>+</button>
+                  </div>
+                </div>
+              ))}
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"10px 0",borderBottom:"1px solid var(--border)"}}>
+                <span style={{fontSize:13}}>⚧️ Płeć</span>
+                <div style={{display:"flex",gap:6}}>
+                  {[["male","♂️ Mężczyzna"],["female","♀️ Kobieta"]].map(([v,l])=>(
+                    <button key={v} onClick={()=>setGender(v)} style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${gender===v?"#ef4444":"var(--border)"}`,background:gender===v?"#ef444422":"var(--card2)",color:gender===v?"#ef4444":"var(--muted)",fontSize:11,cursor:"pointer",fontWeight:gender===v?700:400}}>{l}</button>
+                  ))}
+                </div>
+              </div>
+              <div style={{padding:"10px 0",borderBottom:"1px solid var(--border)"}}>
+                <div style={{fontSize:13,marginBottom:8}}>🎯 Cel</div>
+                <div style={{display:"flex",gap:6}}>
+                  {[["cut","🔥 Redukcja","-20%"],["maintain","⚖️ Utrzymanie","0%"],["bulk","💪 Masa","+10%"]].map(([v,l,d])=>(
+                    <button key={v} onClick={()=>setGoal(v)} style={{flex:1,padding:"8px 4px",borderRadius:8,border:`1px solid ${goal===v?"#ef4444":"var(--border)"}`,background:goal===v?"#ef444422":"var(--card2)",color:goal===v?"#ef4444":"var(--muted)",fontSize:10,cursor:"pointer",fontWeight:goal===v?700:400,textAlign:"center"}}>
+                      <div>{l}</div><div style={{fontSize:9,opacity:.7}}>{d}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <button className="btn btn-red" style={{width:"100%",marginTop:12}} onClick={calcTDEE}>🔢 Oblicz zapotrzebowanie</button>
+              {result&&(
+                <div style={{marginTop:12,background:"var(--card2)",borderRadius:12,padding:"12px 14px"}}>
+                  <div style={{fontWeight:700,color:"var(--muted2)",marginBottom:8,fontSize:11,letterSpacing:.5}}>WYNIK – {actLabel}</div>
+                  {[["BMR (podstawowe)",result.bmr+" kcal","var(--text)"],["TDEE (zapotrzebowanie)",result.tdee+" kcal","#eab308"],["Cel kaloryczny",result.goalKcal+" kcal","#ef4444"]].map(([l,v,c])=>(
+                    <div key={l} style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                      <span style={{color:"var(--muted)",fontSize:13}}>{l}</span>
+                      <strong style={{color:c,fontSize:l.includes("Cel")?18:14}}>{v}</strong>
+                    </div>
+                  ))}
+                  <button className="btn btn-red" style={{width:"100%",marginTop:10}} onClick={()=>{applyResult();alert("✅ Zastosowano! Sprawdź zakładkę Dieta.");}}>✅ Zastosuj w Diecie</button>
+                  <div style={{fontSize:10,color:"var(--muted)",marginTop:6,textAlign:"center"}}>Zaktualizuje TDEE i cel kalorii w Diecie</div>
+                </div>
+              )}
+            </div>
+          );
+        })()}
         {stab==="ai" && (
           <div>
             {/* AI ON/OFF toggle */}
@@ -1277,11 +1369,9 @@ function CardioView({onBack,saveDay,todayStr}) {
 }
 
 // ── SCREEN: DIETA ─────────────────────────────────────────────────────────────
-function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnabled,settings}) {
+function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnabled,settings,tdee,setTdee,goalKcal,setGoalKcal}) {
   const [meals,setMeals]       = useState(()=>storage.get("meals",[]));
-  const [goalKcal,setGoalKcal] = useState(()=>storage.get("goalKcal",2200));
-  const [tdee,setTdee]         = useState(()=>storage.get("tdee",2500));
-  useEffect(()=>{ storage.set("tdee",tdee); },[tdee]);
+
   const [showAdd,setShowAdd]   = useState(false);
   const [imgPrev,setImgPrev]   = useState(null);
   const [newMeal,setNewMeal]   = useState({name:"",kcal:"",protein:"",carbs:"",fat:""});
@@ -1293,7 +1383,6 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
 
   const [histTab,setHistTab]   = useState("today");
   useEffect(()=>{ storage.set("meals",meals); },[meals]);
-  useEffect(()=>{ storage.set("goalKcal",goalKcal); },[goalKcal]);
   const todayStr=today();
   const todayMeals=meals.filter(m=>m.date===todayStr);
   const totalKcal=todayMeals.reduce((s,m)=>s+(m.kcal||0),0);
