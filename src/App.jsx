@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.6.4";
+const APP_VERSION = "4.6.5";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -348,12 +348,18 @@ export default function App() {
   const saveDay  = useCallback((data)=>{
     setDayLogs(p=>{
       const prev = p[todayStr]||{};
-      // Accumulate workoutTypes as array (support multiple workouts per day)
+      // Accumulate workoutTypes as array
       let workoutTypes = prev.workoutTypes ? [...prev.workoutTypes] : (prev.workoutType ? [prev.workoutType] : []);
       if(data.workoutType && !workoutTypes.includes(data.workoutType)) {
         workoutTypes = [...workoutTypes, data.workoutType];
       }
-      return {...p,[todayStr]:{...prev,...data, workoutTypes, workoutType: workoutTypes[workoutTypes.length-1]}};
+      // Accumulate cardio sessions as array
+      let cardioSessions = prev.cardioSessions ? [...prev.cardioSessions] : (prev.cardio ? [prev.cardio] : []);
+      if(data._newCardio) {
+        cardioSessions = [...cardioSessions, data._newCardio];
+      }
+      const {_newCardio, ...rest} = data;
+      return {...p,[todayStr]:{...prev,...rest, workoutTypes, workoutType: workoutTypes[workoutTypes.length-1], cardioSessions}};
     });
   },[todayStr]);
 
@@ -1371,7 +1377,7 @@ function CardioView({onBack,saveDay,todayStr}) {
           </div>
         </div>
         {(type==="walk"||type==="treadmill")&&<div className="card"><div className="row"><span style={{fontSize:13,color:"var(--muted2)",width:80}}>📏 km</span><input className="inp inp-r" type="number" step="0.1" placeholder="3.5" value={km} onChange={e=>setKm(e.target.value)}/></div></div>}
-        <div style={{padding:"0 16px 16px"}}><button className="btn btn-red" onClick={()=>{saveDay({type:"cardio",workoutType:"cardio",cardio:{activityType:type,km:parseFloat(km)||0,elapsed}});setSaved(true);}}>✓ Zapisz</button></div>
+        <div style={{padding:"0 16px 16px"}}><button className="btn btn-red" onClick={()=>{saveDay({type:"cardio",workoutType:"cardio",_newCardio:{activityType:type,km:parseFloat(km)||0,elapsed}});setSaved(true);}}>✓ Zapisz</button></div>
       </>}
     </div>
   );
@@ -2016,12 +2022,23 @@ function ScreenCalendar({history,exerciseDB={},dayLogs,workoutDates,weeklyGoals,
               {log.duration&&<div style={{fontSize:12,color:"var(--muted)",marginBottom:6}}>⏱ {Math.floor(log.duration/60)} min</div>}
               {log.steps&&<div style={{fontSize:13,color:"var(--muted2)",marginBottom:4}}>👟 {log.steps?.toLocaleString()} kroków</div>}
               {log.calories&&<div style={{fontSize:13,color:"var(--muted2)",marginBottom:8}}>🔥 {log.calories} kcal aktywnych</div>}
-              {log.cardio&&<div style={{background:"#eab30822",borderRadius:10,padding:"10px 12px",marginBottom:10}}>
-                <div style={{fontSize:11,fontWeight:700,color:"#eab308",marginBottom:6}}>🏃 CARDIO</div>
-                <div style={{fontSize:13,color:"var(--muted2)"}}>{log.cardio.activityType==="walk"?"🚶 Spacer":log.cardio.activityType==="treadmill"?"🏃 Bieżnia":"🪜 Schody"}</div>
-                {log.cardio.elapsed>0&&<div style={{fontSize:12,color:"var(--muted)",marginTop:4}}>⏱ {Math.floor(log.cardio.elapsed/60)} min {log.cardio.elapsed%60} sek</div>}
-                {log.cardio.km>0&&<div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>📏 {log.cardio.km} km</div>}
-              </div>}
+              {(()=>{
+                const sessions = log.cardioSessions||(log.cardio?[log.cardio]:[]);
+                if(!sessions.length) return null;
+                const actLabel = t=>t==="walk"?"🚶 Spacer":t==="treadmill"?"🏃 Bieżnia":"🪜 Schody";
+                return (
+                  <div style={{background:"#eab30822",borderRadius:10,padding:"10px 12px",marginBottom:10}}>
+                    <div style={{fontSize:11,fontWeight:700,color:"#eab308",marginBottom:8}}>🏃 CARDIO ({sessions.length}x)</div>
+                    {sessions.map((s,i)=>(
+                      <div key={i} style={{paddingTop:i>0?8:0,marginTop:i>0?8:0,borderTop:i>0?"1px solid #eab30833":"none"}}>
+                        <div style={{fontSize:13,color:"var(--muted2)",fontWeight:600}}>{actLabel(s.activityType)}</div>
+                        {s.elapsed>0&&<div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>⏱ {Math.floor(s.elapsed/60)} min {s.elapsed%60} sek</div>}
+                        {s.km>0&&<div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>📏 {s.km} km</div>}
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
               {entries.length>0&&<><div style={{fontSize:11,textTransform:"uppercase",letterSpacing:1.5,color:"var(--muted)",fontWeight:600,marginBottom:8}}>Ćwiczenia</div>
                 {entries.map((e,i)=>(
                   <div key={i} className="ex-row">
