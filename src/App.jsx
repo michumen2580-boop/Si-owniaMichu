@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.6.1";
+const APP_VERSION = "4.6.2";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -277,6 +277,7 @@ export default function App() {
   const [tdee,       setTdee]       = useState(()=>storage.get("tdee",2500));
   const [goalKcal,   setGoalKcal]   = useState(()=>storage.get("goalKcal",2200));
   useEffect(()=>{ storage.set("tdee",tdee); },[tdee]);
+  useEffect(()=>{ storage.set("goalKcal",goalKcal); },[goalKcal]);
   const [aiEnabled,  setAiEnabled]  = useState(()=>storage.get("aiEnabled",false));
   useEffect(()=>{ storage.set("geminiKey", geminiKey); },[geminiKey]);
   useEffect(()=>{ storage.set("aiEnabled", aiEnabled); },[aiEnabled]);
