@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.6.2";
+const APP_VERSION = "4.6.3";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -899,7 +899,7 @@ function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,setti
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,margin:"0 16px 12px"}}>
           {[{id:"push",e:"🔴",n:"PUSH",d:"Klata·Barki·Triceps"},{id:"pull",e:"🔵",n:"PULL",d:"Plecy·Biceps"},{id:"fbw",e:"🟢",n:"FBW",d:"Full Body"},{id:"cardio",e:"🟡",n:"CARDIO",d:"Spacer·Bieżnia"}].map(t=>(
             <div key={t.id} style={{background:"var(--card)",border:"1.5px solid var(--border)",borderRadius:16,padding:"20px 16px",cursor:"pointer",display:"flex",flexDirection:"column",gap:6}}
-              onClick={()=>{setSelType(t.id);setPhase(t.id==="cardio"?"cardio":"session");saveDay({workoutType:t.id,type:"training"});}}>
+              onClick={()=>{setSelType(t.id);setPhase(t.id==="cardio"?"cardio":"session");}}>
               <span style={{fontSize:28}}>{t.e}</span>
               <span style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:1.5,color:TYPE_COLOR[t.id]||"#eab308"}}>{t.n}</span>
               <span style={{fontSize:11,color:"var(--muted)"}}>{t.d}</span>
@@ -911,7 +911,7 @@ function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,setti
           {MUSCLES.map(m=>{
             const MUSCLE_ICON={klata:"🫁",plecy:"🔵",barki:"🏋️",biceps:"💪",triceps:"🤜",nogi:"🦵"};
             return (
-              <div key={m} onClick={()=>{setSelType(m);setPhase("session");saveDay({workoutType:m,type:"training"});}}
+              <div key={m} onClick={()=>{setSelType(m);setPhase("session");}}
                 style={{background:"var(--card)",border:"1.5px solid var(--border)",borderRadius:14,padding:"14px 10px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
                 <span style={{fontSize:22}}>{MUSCLE_ICON[m]||"💪"}</span>
                 <span style={{fontFamily:"'Bebas Neue'",fontSize:16,letterSpacing:1,color:MUSCLE_COLOR[m]}}>{MUSCLE_LABEL[m].toUpperCase()}</span>
@@ -1191,10 +1191,11 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
     const entries = exList
       .filter(ex => {
         const key = ex.id||ex.name;
-        // Only save if user actually checked at least one set OR explicitly finished the exercise
         const hasDoneSets = (done[key]||[]).some(Boolean);
+        const hasWeight = weights[key] && !isNaN(parseFloat(weights[key])) && parseFloat(weights[key]) > 0;
         const isFinished = finished_ex.has(key);
-        return (hasDoneSets || isFinished) && !excluded.has(key);
+        // Save only if: has checked sets OR (finished AND has weight)
+        return (hasDoneSets || (isFinished && hasWeight)) && !excluded.has(key);
       })
       .map(ex => {
         const key = ex.id||ex.name;
@@ -1235,7 +1236,8 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
   };
 
   const doneSets  = Object.values(done).reduce((s,a)=>s+a.filter(Boolean).length,0);
-  const totalSets = exList.length*3;
+  const activeExList = exList.filter(ex=>!excluded.has(ex.id||ex.name));
+  const totalSets = activeExList.length*3;
 
   if(finished) return (
     <div className="anim" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"80vh",gap:16,padding:24,textAlign:"center"}}>
