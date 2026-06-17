@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.6.3";
+const APP_VERSION = "4.6.4";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1371,7 +1371,7 @@ function CardioView({onBack,saveDay,todayStr}) {
           </div>
         </div>
         {(type==="walk"||type==="treadmill")&&<div className="card"><div className="row"><span style={{fontSize:13,color:"var(--muted2)",width:80}}>📏 km</span><input className="inp inp-r" type="number" step="0.1" placeholder="3.5" value={km} onChange={e=>setKm(e.target.value)}/></div></div>}
-        <div style={{padding:"0 16px 16px"}}><button className="btn btn-red" onClick={()=>{saveDay({type:"cardio",cardio:{activityType:type,km:parseFloat(km)||0,elapsed}});setSaved(true);}}>✓ Zapisz</button></div>
+        <div style={{padding:"0 16px 16px"}}><button className="btn btn-red" onClick={()=>{saveDay({type:"cardio",workoutType:"cardio",cardio:{activityType:type,km:parseFloat(km)||0,elapsed}});setSaved(true);}}>✓ Zapisz</button></div>
       </>}
     </div>
   );
@@ -2008,15 +2008,25 @@ function ScreenCalendar({history,exerciseDB={},dayLogs,workoutDates,weeklyGoals,
           <div className="modal-bg" onClick={()=>setSelDay(null)}>
             <div className="modal" onClick={e=>e.stopPropagation()}>
               <div className="modal-handle"/>
-              <div className="modal-title" style={{color:col}}>{fmt(dayStr)} – {tp?tp.toUpperCase():"Brak"}</div>
-              {log.duration&&<div style={{fontSize:12,color:"var(--muted)",marginBottom:8}}>⏱ {Math.floor(log.duration/60)} min</div>}
+              <div className="modal-title" style={{color:col}}>{fmt(dayStr)}</div>
+              {selTypes.length>1&&<div style={{display:"flex",gap:6,marginBottom:10}}>
+                {selTypes.map(t=><span key={t} style={{fontSize:11,fontWeight:700,color:TYPE_COLOR[t]||"#e8d5b0",background:(TYPE_COLOR[t]||"#e8d5b0")+"22",borderRadius:6,padding:"2px 8px"}}>{t.toUpperCase()}</span>)}
+              </div>}
+              {selTypes.length===1&&<div style={{fontSize:13,fontWeight:700,color:col,marginBottom:8}}>{tp?.toUpperCase()}</div>}
+              {log.duration&&<div style={{fontSize:12,color:"var(--muted)",marginBottom:6}}>⏱ {Math.floor(log.duration/60)} min</div>}
               {log.steps&&<div style={{fontSize:13,color:"var(--muted2)",marginBottom:4}}>👟 {log.steps?.toLocaleString()} kroków</div>}
-              {log.calories&&<div style={{fontSize:13,color:"var(--muted2)",marginBottom:8}}>🔥 {log.calories} kcal</div>}
+              {log.calories&&<div style={{fontSize:13,color:"var(--muted2)",marginBottom:8}}>🔥 {log.calories} kcal aktywnych</div>}
+              {log.cardio&&<div style={{background:"#eab30822",borderRadius:10,padding:"10px 12px",marginBottom:10}}>
+                <div style={{fontSize:11,fontWeight:700,color:"#eab308",marginBottom:6}}>🏃 CARDIO</div>
+                <div style={{fontSize:13,color:"var(--muted2)"}}>{log.cardio.activityType==="walk"?"🚶 Spacer":log.cardio.activityType==="treadmill"?"🏃 Bieżnia":"🪜 Schody"}</div>
+                {log.cardio.elapsed>0&&<div style={{fontSize:12,color:"var(--muted)",marginTop:4}}>⏱ {Math.floor(log.cardio.elapsed/60)} min {log.cardio.elapsed%60} sek</div>}
+                {log.cardio.km>0&&<div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>📏 {log.cardio.km} km</div>}
+              </div>}
               {entries.length>0&&<><div style={{fontSize:11,textTransform:"uppercase",letterSpacing:1.5,color:"var(--muted)",fontWeight:600,marginBottom:8}}>Ćwiczenia</div>
                 {entries.map((e,i)=>(
                   <div key={i} className="ex-row">
                     <div><div className="ex-name">{e.exercise}</div><div style={{fontSize:10,color:"var(--muted)",marginTop:1}}>{e.sets||0}×</div></div>
-                    <span className="ex-wt" style={{color:col}}>{e.weight} <span style={{fontSize:12}}>kg</span></span>
+                    <span className="ex-wt" style={{color:TYPE_COLOR[e.type]||col}}>{e.weight} <span style={{fontSize:12}}>kg</span></span>
                   </div>
                 ))}</>}
               {log.note&&<div style={{marginTop:12,padding:"10px 12px",background:"var(--card2)",borderRadius:10,fontSize:12,color:"var(--muted2)"}}>{log.note}</div>}
@@ -2118,7 +2128,11 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
       const entries=history.filter(e=>e.exercise===exName).sort((a,b)=>new Date(b.date)-new Date(a.date));
       if(!entries.length) return null;
       return {name:exName,latest:entries[0].weight,best:Math.max(...entries.map(e=>e.weight)),date:entries[0].date};
-    }).filter(Boolean);
+    }).filter(Boolean).sort((a,b)=>{
+      // Most recent date first, then alphabetically
+      if(a.date!==b.date) return a.date>b.date?-1:1;
+      return a.name.localeCompare(b.name,"pl");
+    });
   };
 
   // Body weight
