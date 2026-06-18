@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.6.5";
+const APP_VERSION = "4.6.7";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1254,15 +1254,23 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
     </div>
   );
 
+  const pct = totalSets>0 ? Math.min(100,Math.round((doneSets/totalSets)*100)) : 0;
+
   return (
     <div className="anim">
-      <div style={{padding:"48px 20px 12px",display:"flex",alignItems:"center",gap:12}}>
-        <button onClick={onBack} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--text)"}}><Ic n="chL" s={18}/></button>
-        <div style={{flex:1,fontFamily:"'Bebas Neue'",fontSize:28,letterSpacing:2,color}}>{(MUSCLE_LABEL[type]||type).toUpperCase()}</div>
-        <div style={{display:"flex",alignItems:"center",gap:6,background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,padding:"6px 12px"}}><Ic n="clock" s={14}/><span style={{fontFamily:"'Bebas Neue'",fontSize:18}}>{fmtTime(elapsed)}</span></div>
+      {/* STICKY TIMER BAR */}
+      <div style={{position:"sticky",top:0,zIndex:100,background:"var(--bg)",borderBottom:"1px solid var(--border)",padding:"8px 16px",display:"flex",alignItems:"center",gap:10}}>
+        <button onClick={onBack} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--text)",flexShrink:0}}><Ic n="chL" s={16}/></button>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:20,letterSpacing:2,color,flexShrink:0}}>{(MUSCLE_LABEL[type]||type).toUpperCase()}</div>
+        <div style={{flex:1,background:"var(--border)",borderRadius:4,height:6,margin:"0 4px"}}>
+          <div style={{height:"100%",borderRadius:4,background:color,width:`${pct}%`,transition:"width .3s"}}/>
+        </div>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:22,color,letterSpacing:1,flexShrink:0}}>{fmtTime(elapsed)}</div>
+        <div style={{fontSize:10,color:"var(--muted)",flexShrink:0}}>{doneSets}/{totalSets}</div>
       </div>
-      <div style={{margin:"0 20px 8px",background:"var(--border)",borderRadius:4,height:4}}>
-        <div style={{height:"100%",borderRadius:4,background:color,width:`${totalSets>0?Math.min(100,(doneSets/totalSets)*100):0}%`,transition:"width .3s"}}/>
+
+      <div style={{padding:"12px 20px 4px",display:"flex",alignItems:"center",gap:12}}>
+        <div style={{flex:1}}/>
       </div>
       <div style={{textAlign:"center",fontSize:12,color:"var(--muted)",marginBottom:12}}>{doneSets} / {totalSets} serii</div>
 
@@ -1349,11 +1357,23 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
 function CardioView({onBack,saveDay,todayStr}) {
   const [type,setType]=useState(null);
   const [km,setKm]=useState("");
+  const [level,setLevel]=useState("4"); // schody - poziom
   const [running,setRunning]=useState(false);
   const [elapsed,setElapsed]=useState(0);
+  const [manualMin,setManualMin]=useState(""); // ręczne minuty
+  const [manualSec,setManualSec]=useState(""); // ręczne sekundy
+  const [useManual,setUseManual]=useState(false);
   const [saved,setSaved]=useState(false);
   useEffect(()=>{ if(!running)return; const t=setInterval(()=>setElapsed(e=>e+1),1000); return()=>clearInterval(t); },[running]);
   const color="#eab308";
+
+  const getFinalElapsed = () => {
+    if(useManual||elapsed===0) {
+      return (parseInt(manualMin)||0)*60 + (parseInt(manualSec)||0);
+    }
+    return elapsed;
+  };
+
   if(saved) return <div className="anim" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"80vh",gap:16}}><div style={{fontSize:64}}>✅</div><div style={{fontFamily:"'Bebas Neue'",fontSize:32}}>ZAPISANO!</div><button className="btn btn-red" style={{width:"auto",paddingLeft:32,paddingRight:32}} onClick={onBack}>Powrót</button></div>;
   return (
     <div className="anim">
@@ -1361,6 +1381,8 @@ function CardioView({onBack,saveDay,todayStr}) {
         <button onClick={onBack} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--text)"}}><Ic n="chL" s={18}/></button>
         <div style={{fontFamily:"'Bebas Neue'",fontSize:28,letterSpacing:2,color}}>CARDIO</div>
       </div>
+
+      {/* Typ aktywności */}
       <div style={{display:"flex",gap:8,margin:"0 16px 16px"}}>
         {[{id:"walk",e:"🚶",n:"Spacer"},{id:"treadmill",e:"🏃",n:"Bieżnia"},{id:"stairs",e:"🪜",n:"Schody"}].map(ct=>(
           <button key={ct.id} onClick={()=>setType(ct.id)} style={{flex:1,background:type===ct.id?"#eab30822":"var(--card)",border:`1.5px solid ${type===ct.id?"#eab308":"var(--border)"}`,borderRadius:14,padding:"14px 8px",cursor:"pointer",display:"flex",flexDirection:"column",alignItems:"center",gap:6}}>
@@ -1368,16 +1390,83 @@ function CardioView({onBack,saveDay,todayStr}) {
           </button>
         ))}
       </div>
+
       {type&&<>
-        <div className="card" style={{textAlign:"center"}}>
-          <div style={{fontFamily:"'Bebas Neue'",fontSize:56,letterSpacing:4,color}}>{fmtTime(elapsed)}</div>
-          <div style={{display:"flex",gap:10,marginTop:12,justifyContent:"center"}}>
-            <button onClick={()=>setRunning(r=>!r)} style={{background:running?"#ef444422":"#eab30822",border:`1.5px solid ${running?"#ef4444":"#eab308"}`,borderRadius:12,padding:"10px 24px",color:running?"#ef4444":"#eab308",fontWeight:700,cursor:"pointer",fontSize:14}}>{running?"⏸ Pauza":"▶ Start"}</button>
-            <button onClick={()=>{setRunning(false);setElapsed(0);}} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:12,padding:"10px 16px",color:"var(--muted)",fontWeight:700,cursor:"pointer",fontSize:14}}>Reset</button>
+        {/* Timer */}
+        <div className="card">
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+            <span style={{fontSize:12,color:"var(--muted)"}}>⏱ Czas</span>
+            <button onClick={()=>setUseManual(m=>!m)} style={{fontSize:11,padding:"4px 10px",borderRadius:8,border:`1px solid ${useManual?"#eab308":"var(--border)"}`,background:useManual?"#eab30822":"var(--card2)",color:useManual?"#eab308":"var(--muted)",cursor:"pointer"}}>
+              {useManual?"✏️ Ręcznie":"⏱ Timer"}
+            </button>
           </div>
+
+          {!useManual ? (
+            <>
+              <div style={{fontFamily:"'Bebas Neue'",fontSize:56,letterSpacing:4,color,textAlign:"center"}}>{fmtTime(elapsed)}</div>
+              <div style={{display:"flex",gap:10,marginTop:12,justifyContent:"center"}}>
+                <button onClick={()=>setRunning(r=>!r)} style={{background:running?"#ef444422":"#eab30822",border:`1.5px solid ${running?"#ef4444":"#eab308"}`,borderRadius:12,padding:"10px 24px",color:running?"#ef4444":"#eab308",fontWeight:700,cursor:"pointer",fontSize:14}}>{running?"⏸ Pauza":"▶ Start"}</button>
+                <button onClick={()=>{setRunning(false);setElapsed(0);}} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:12,padding:"10px 16px",color:"var(--muted)",fontWeight:700,cursor:"pointer",fontSize:14}}>Reset</button>
+              </div>
+              {elapsed===0&&<div style={{textAlign:"center",marginTop:10,fontSize:11,color:"var(--muted)"}}>lub przełącz na ✏️ Ręcznie aby wpisać czas</div>}
+            </>
+          ) : (
+            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginTop:4}}>
+              <div style={{textAlign:"center"}}>
+                <input type="number" min="0" max="300" placeholder="42" value={manualMin}
+                  onChange={e=>setManualMin(e.target.value)}
+                  style={{width:72,background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 8px",color:"var(--text)",fontFamily:"'Bebas Neue'",fontSize:32,textAlign:"center",outline:"none"}}/>
+                <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>min</div>
+              </div>
+              <div style={{fontFamily:"'Bebas Neue'",fontSize:32,color:"var(--muted)"}}>:</div>
+              <div style={{textAlign:"center"}}>
+                <input type="number" min="0" max="59" placeholder="30" value={manualSec}
+                  onChange={e=>setManualSec(e.target.value)}
+                  style={{width:72,background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 8px",color:"var(--text)",fontFamily:"'Bebas Neue'",fontSize:32,textAlign:"center",outline:"none"}}/>
+                <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>sek</div>
+              </div>
+            </div>
+          )}
         </div>
-        {(type==="walk"||type==="treadmill")&&<div className="card"><div className="row"><span style={{fontSize:13,color:"var(--muted2)",width:80}}>📏 km</span><input className="inp inp-r" type="number" step="0.1" placeholder="3.5" value={km} onChange={e=>setKm(e.target.value)}/></div></div>}
-        <div style={{padding:"0 16px 16px"}}><button className="btn btn-red" onClick={()=>{saveDay({type:"cardio",workoutType:"cardio",_newCardio:{activityType:type,km:parseFloat(km)||0,elapsed}});setSaved(true);}}>✓ Zapisz</button></div>
+
+        {/* Dystans – Spacer i Bieżnia */}
+        {(type==="walk"||type==="treadmill")&&(
+          <div className="card">
+            <div className="row">
+              <span style={{fontSize:13,color:"var(--muted2)",width:80}}>📏 Dystans</span>
+              <input className="inp inp-r" type="number" step="0.1" placeholder="3.5" value={km} onChange={e=>setKm(e.target.value)}/>
+              <span style={{fontSize:13,color:"var(--muted)",marginLeft:6}}>km</span>
+            </div>
+          </div>
+        )}
+
+        {/* Poziom – Schody */}
+        {type==="stairs"&&(
+          <div className="card">
+            <div style={{fontSize:12,color:"var(--muted)",marginBottom:10}}>🪜 Poziom trudności</div>
+            <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:16}}>
+              <button onClick={()=>setLevel(l=>String(Math.max(1,parseInt(l)-1)))} style={{width:40,height:40,borderRadius:10,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:22,cursor:"pointer"}}>−</button>
+              <div style={{textAlign:"center"}}>
+                <div style={{fontFamily:"'Bebas Neue'",fontSize:48,color,lineHeight:1}}>{level}</div>
+                <div style={{fontSize:11,color:"var(--muted)"}}>poziom</div>
+              </div>
+              <button onClick={()=>setLevel(l=>String(Math.min(20,parseInt(l)+1)))} style={{width:40,height:40,borderRadius:10,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:22,cursor:"pointer"}}>+</button>
+            </div>
+          </div>
+        )}
+
+        <div style={{padding:"0 16px 16px"}}>
+          <button className="btn btn-red" onClick={()=>{
+            const finalElapsed = getFinalElapsed();
+            saveDay({type:"cardio",workoutType:"cardio",_newCardio:{
+              activityType:type,
+              km:parseFloat(km)||0,
+              elapsed:finalElapsed,
+              level:type==="stairs"?parseInt(level):undefined
+            }});
+            setSaved(true);
+          }}>✓ Zapisz</button>
+        </div>
       </>}
     </div>
   );
@@ -2026,14 +2115,16 @@ function ScreenCalendar({history,exerciseDB={},dayLogs,workoutDates,weeklyGoals,
                 const sessions = log.cardioSessions||(log.cardio?[log.cardio]:[]);
                 if(!sessions.length) return null;
                 const actLabel = t=>t==="walk"?"🚶 Spacer":t==="treadmill"?"🏃 Bieżnia":"🪜 Schody";
+                    const fmtDur = s=>s>0?`${Math.floor(s/60)} min${s%60>0?` ${s%60} sek`:""}`:"–";
                 return (
                   <div style={{background:"#eab30822",borderRadius:10,padding:"10px 12px",marginBottom:10}}>
                     <div style={{fontSize:11,fontWeight:700,color:"#eab308",marginBottom:8}}>🏃 CARDIO ({sessions.length}x)</div>
                     {sessions.map((s,i)=>(
                       <div key={i} style={{paddingTop:i>0?8:0,marginTop:i>0?8:0,borderTop:i>0?"1px solid #eab30833":"none"}}>
                         <div style={{fontSize:13,color:"var(--muted2)",fontWeight:600}}>{actLabel(s.activityType)}</div>
-                        {s.elapsed>0&&<div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>⏱ {Math.floor(s.elapsed/60)} min {s.elapsed%60} sek</div>}
+                        {s.elapsed>0&&<div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>⏱ {fmtDur(s.elapsed)}</div>}
                         {s.km>0&&<div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>📏 {s.km} km</div>}
+                        {s.level&&<div style={{fontSize:12,color:"var(--muted)",marginTop:2}}>🪜 Poziom {s.level}</div>}
                       </div>
                     ))}
                   </div>
