@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.6.7";
+const APP_VERSION = "4.6.8";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1259,14 +1259,31 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
   return (
     <div className="anim">
       {/* STICKY TIMER BAR */}
-      <div style={{position:"sticky",top:0,zIndex:100,background:"var(--bg)",borderBottom:"1px solid var(--border)",padding:"8px 16px",display:"flex",alignItems:"center",gap:10}}>
-        <button onClick={onBack} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--text)",flexShrink:0}}><Ic n="chL" s={16}/></button>
-        <div style={{fontFamily:"'Bebas Neue'",fontSize:20,letterSpacing:2,color,flexShrink:0}}>{(MUSCLE_LABEL[type]||type).toUpperCase()}</div>
-        <div style={{flex:1,background:"var(--border)",borderRadius:4,height:6,margin:"0 4px"}}>
-          <div style={{height:"100%",borderRadius:4,background:color,width:`${pct}%`,transition:"width .3s"}}/>
+      <div style={{position:"sticky",top:0,zIndex:100,background:"var(--bg)",borderBottom:"1px solid var(--border)"}}>
+        {/* Górna belka – trening */}
+        <div style={{padding:"8px 16px",display:"flex",alignItems:"center",gap:10}}>
+          <button onClick={onBack} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--text)",flexShrink:0}}><Ic n="chL" s={16}/></button>
+          <div style={{fontFamily:"'Bebas Neue'",fontSize:20,letterSpacing:2,color,flexShrink:0}}>{(MUSCLE_LABEL[type]||type).toUpperCase()}</div>
+          <div style={{flex:1,background:"var(--border)",borderRadius:4,height:6,margin:"0 4px"}}>
+            <div style={{height:"100%",borderRadius:4,background:color,width:`${pct}%`,transition:"width .3s"}}/>
+          </div>
+          <div style={{fontFamily:"'Bebas Neue'",fontSize:22,color,letterSpacing:1,flexShrink:0}}>{fmtTime(elapsed)}</div>
+          <div style={{fontSize:10,color:"var(--muted)",flexShrink:0}}>{doneSets}/{totalSets}</div>
         </div>
-        <div style={{fontFamily:"'Bebas Neue'",fontSize:22,color,letterSpacing:1,flexShrink:0}}>{fmtTime(elapsed)}</div>
-        <div style={{fontSize:10,color:"var(--muted)",flexShrink:0}}>{doneSets}/{totalSets}</div>
+        {/* Licznik przerwy – pojawia się gdy aktywny */}
+        {restTimer!==null&&(
+          <div style={{background:color+"22",borderTop:`1px solid ${color}44`,padding:"8px 16px",display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+            <div style={{display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:11,color,fontWeight:700,letterSpacing:1}}>⏸ PRZERWA</span>
+              <span style={{fontFamily:"'Bebas Neue'",fontSize:28,color,lineHeight:1}}>{fmtTime(restTimer)}</span>
+              {restEx&&<span style={{fontSize:11,color:"var(--muted)"}}>po: {restEx}</span>}
+            </div>
+            <button onClick={()=>{setRestTimer(null);setRestEx(null);}}
+              style={{background:color,border:"none",borderRadius:8,padding:"6px 14px",color:"#000",fontWeight:700,cursor:"pointer",fontSize:13}}>
+              Pomiń
+            </button>
+          </div>
+        )}
       </div>
 
       <div style={{padding:"12px 20px 4px",display:"flex",alignItems:"center",gap:12}}>
