@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.6.8";
+const APP_VERSION = "4.6.9";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -358,7 +358,12 @@ export default function App() {
       if(data._newCardio) {
         cardioSessions = [...cardioSessions, data._newCardio];
       }
-      const {_newCardio, ...rest} = data;
+      const {_newCardio, _editPastDay, ...rest} = data;
+      // Handle past day edit
+      if(_editPastDay) {
+        const {ds, steps, calories} = _editPastDay;
+        return {...p, [ds]:{...(p[ds]||{}), steps, calories}};
+      }
       return {...p,[todayStr]:{...prev,...rest, workoutTypes, workoutType: workoutTypes[workoutTypes.length-1], cardioSessions}};
     });
   },[todayStr]);
@@ -661,6 +666,7 @@ function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,
 function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onSettings,settings}) {
   const [steps,setSteps]     = useState(todayLog.steps||"");
   const [kcal,setKcal]       = useState(todayLog.calories||"");
+  const [editDay,setEditDay] = useState(null); // {ds, steps, kcal} – edycja poprzedniego dnia
   const now = new Date();
   const greet = now.getHours()<12?"Dzień dobry":now.getHours()<18?"Cześć":"Dobry wieczór";
   // Last workout = most recent entry (including today)
@@ -773,11 +779,12 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
                   const isT=d.ds===todayStr;
                   const ok=d.steps>=STEP_GOAL;
                   return (
-                    <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                    <div key={i} onClick={()=>setEditDay({ds:d.ds,steps:d.steps||"",kcal:dayLogs[d.ds]?.calories||""})}
+                      style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,cursor:"pointer"}}>
                       <div style={{fontSize:8,color:isT?"var(--text)":"var(--muted)",height:14,display:"flex",alignItems:"flex-end",textAlign:"center",lineHeight:1}}>
-                        {d.steps>0?(d.steps>=1000?Math.round(d.steps/1000)+"k":d.steps):""}
+                        {d.steps>0?(d.steps>=1000?Math.round(d.steps/1000)+"k":d.steps):"✏️"}
                       </div>
-                      <div style={{width:"100%",height:h,borderRadius:3,background:h===0?"transparent":isT?(ok?"#22c55e":"#eab308"):ok?"#22c55e44":"#eab30833",border:h>0&&isT?`1px solid ${ok?"#22c55e":"#eab308"}`:"none"}}/>
+                      <div style={{width:"100%",height:Math.max(8,h),borderRadius:3,background:h===0?"var(--border)":isT?(ok?"#22c55e":"#eab308"):ok?"#22c55e44":"#eab30833",border:`1px solid ${h===0?"var(--border)":isT?(ok?"#22c55e":"#eab308"):ok?"#22c55e44":"#eab30833"}`,opacity:h===0?0.3:1}}/>
                     </div>
                   );
                 })}
@@ -798,11 +805,12 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
                     const isT=d.ds===todayStr;
                     const ok=d.kcal>=KCAL_GOAL;
                     return (
-                      <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
+                      <div key={i} onClick={()=>setEditDay({ds:d.ds,steps:dayLogs[d.ds]?.steps||"",kcal:d.kcal||""})}
+                        style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2,cursor:"pointer"}}>
                         <div style={{fontSize:8,color:isT?"var(--text)":"var(--muted)",height:14,display:"flex",alignItems:"flex-end",textAlign:"center"}}>
-                          {d.kcal>0?d.kcal:""}
+                          {d.kcal>0?d.kcal:"✏️"}
                         </div>
-                        <div style={{width:"100%",height:h,borderRadius:3,background:h===0?"transparent":isT?(ok?"#22c55e":"#ef4444"):ok?"#22c55e44":"#ef444433",border:h>0&&isT?`1px solid ${ok?"#22c55e":"#ef4444"}`:"none"}}/>
+                        <div style={{width:"100%",height:Math.max(8,h),borderRadius:3,background:h===0?"var(--border)":isT?(ok?"#22c55e":"#ef4444"):ok?"#22c55e44":"#ef444433",border:`1px solid ${h===0?"var(--border)":isT?(ok?"#22c55e":"#ef4444"):ok?"#22c55e44":"#ef444433"}`,opacity:h===0?0.3:1}}/>
                       </div>
                     );
                   })}
@@ -820,6 +828,43 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
           <button className="btn btn-red" onClick={()=>saveDay({steps:Number(steps)||0,calories:Number(kcal)||0})}>Zapisz</button>
         </div>
       </div>
+      {/* MODAL EDYCJI POPRZEDNIEGO DNIA */}
+      {editDay&&(
+        <div className="modal-bg" onClick={()=>setEditDay(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-handle"/>
+            <div className="modal-title">✏️ {editDay.ds===todayStr?"Dziś":editDay.ds.split("-").reverse().join(".")}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:12,marginBottom:16}}>
+              <div className="row">
+                <span style={{fontSize:13,color:"var(--muted2)",width:110}}>👟 Kroki</span>
+                <input className="inp inp-r" type="number" placeholder="np. 8000"
+                  value={editDay.steps}
+                  onChange={e=>setEditDay(p=>({...p,steps:e.target.value}))}/>
+              </div>
+              <div className="row">
+                <span style={{fontSize:13,color:"var(--muted2)",width:110}}>🔥 Kcal aktywne</span>
+                <input className="inp inp-r" type="number" placeholder="np. 500"
+                  value={editDay.kcal}
+                  onChange={e=>setEditDay(p=>({...p,kcal:e.target.value}))}/>
+              </div>
+            </div>
+            <button className="btn btn-red" onClick={()=>{
+              // Save to the specific day in dayLogs
+              const ds = editDay.ds;
+              const steps = Number(editDay.steps)||0;
+              const calories = Number(editDay.kcal)||0;
+              if(ds===todayStr) {
+                saveDay({steps,calories});
+              } else {
+                // Direct dayLogs update for past days via saveDay workaround
+                // We need setDayLogs - pass via a special key
+                saveDay({_editPastDay:{ds,steps,calories}});
+              }
+              setEditDay(null);
+            }}>💾 Zapisz</button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
