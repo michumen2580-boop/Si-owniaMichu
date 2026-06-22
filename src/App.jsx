@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.6.9";
+const APP_VERSION = "4.7.0";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1242,17 +1242,14 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
     const entries = exList
       .filter(ex => {
         const key = ex.id||ex.name;
+        // ONLY save if user actually checked at least one set
         const hasDoneSets = (done[key]||[]).some(Boolean);
-        const hasWeight = weights[key] && !isNaN(parseFloat(weights[key])) && parseFloat(weights[key]) > 0;
-        const isFinished = finished_ex.has(key);
-        // Save only if: has checked sets OR (finished AND has weight)
-        return (hasDoneSets || (isFinished && hasWeight)) && !excluded.has(key);
+        return hasDoneSets && !excluded.has(key);
       })
       .map(ex => {
         const key = ex.id||ex.name;
         const doneSetsCount = (done[key]||[]).filter(Boolean).length;
-        // Use actual done sets; if none checked but has weight, assume 3 (user skipped checkboxes)
-        const completedSets = doneSetsCount > 0 ? doneSetsCount : 3;
+        const completedSets = doneSetsCount; // exact count, never assume
         return {
           date: todayStr, type, exercise: ex.name,
           weight: parseFloat(weights[key]) || 0,
