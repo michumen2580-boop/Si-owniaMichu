@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.7.4";
+const APP_VERSION = "4.7.5";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -2084,10 +2084,15 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
               .slice(0,5)
               .map(([name])=>byName[name]);
 
-            // Ostatnio dodane – 5 unikalnych nazw od końca
+            // Ostatnio dodane – 5 unikalnych nazw, sortowane po dacie+id
+            const sortedByDate = [...validMeals].sort((a,b)=>{
+              const da=a.date+String(a.id||0);
+              const db=b.date+String(b.id||0);
+              return db>da?1:-1;
+            });
             const recentUniq = [];
-            for(let i=validMeals.length-1;i>=0&&recentUniq.length<5;i--){
-              const m=validMeals[i];
+            for(let i=0;i<sortedByDate.length&&recentUniq.length<5;i++){
+              const m=sortedByDate[i];
               if(!recentUniq.find(x=>x.name===m.name)) recentUniq.push(m);
             }
 
