@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.7.3";
+const APP_VERSION = "4.7.4";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -2069,20 +2069,58 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
             ))}
           </div>
           {(()=>{
-            const recent=[...meals].filter(m=>m.name&&m.kcal).reduce((acc,m)=>{if(!acc.find(x=>x.name===m.name))acc.push(m);return acc;},[]).slice(-8).reverse();
-            if(!recent.length) return null;
+            const validMeals = meals.filter(m=>m.name&&m.kcal);
+            if(!validMeals.length) return null;
+
+            // Najczęściej dodawane – zlicz po nazwie
+            const freq = {};
+            const byName = {}; // przechowuje ostatnie makro dla danej nazwy
+            validMeals.forEach(m=>{
+              freq[m.name]=(freq[m.name]||0)+1;
+              byName[m.name]=m; // nadpisuje – zostaje najnowsze
+            });
+            const topFreq = Object.entries(freq)
+              .sort((a,b)=>b[1]-a[1])
+              .slice(0,5)
+              .map(([name])=>byName[name]);
+
+            // Ostatnio dodane – 5 unikalnych nazw od końca
+            const recentUniq = [];
+            for(let i=validMeals.length-1;i>=0&&recentUniq.length<5;i--){
+              const m=validMeals[i];
+              if(!recentUniq.find(x=>x.name===m.name)) recentUniq.push(m);
+            }
+
+            const addQuick = m => setMeals(p=>[{
+              id:Date.now(),date:todayStr,
+              name:m.name,kcal:m.kcal,
+              protein:m.protein||0,carbs:m.carbs||0,fat:m.fat||0,
+              time:new Date().toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})
+            },...p]);
+
+            const Chip = ({m,badge})=>(
+              <button onClick={()=>addQuick(m)} style={{display:"flex",alignItems:"center",gap:6,padding:"5px 10px",borderRadius:20,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--muted2)",fontSize:11,cursor:"pointer",textAlign:"left"}}>
+                {badge&&<span style={{fontSize:9,background:"#ef444422",color:"#ef4444",borderRadius:4,padding:"1px 4px",fontWeight:700}}>{badge}</span>}
+                <strong style={{color:"var(--text)"}}>{m.name}</strong>
+                <span style={{color:"var(--muted)"}}>{m.kcal} kcal</span>
+              </button>
+            );
+
             return (
               <div style={{marginTop:10}}>
-                <div style={{fontSize:11,color:"var(--muted)",marginBottom:6}}>⚡ Szybkie dodanie:</div>
-                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
-                  {recent.map((m,i)=>(
-                    <button key={i} onClick={()=>{
-                      setMeals(p=>[{id:Date.now(),date:todayStr,name:m.name,kcal:m.kcal,protein:m.protein||0,carbs:m.carbs||0,fat:m.fat||0,time:new Date().toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})},...p]);
-                    }} style={{padding:"5px 10px",borderRadius:20,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--muted2)",fontSize:11,cursor:"pointer"}}>
-                      <strong>{m.name}</strong> <span style={{color:"var(--muted)"}}>{m.kcal} kcal</span>
-                    </button>
-                  ))}
-                </div>
+                <div style={{fontSize:11,color:"var(--muted)",marginBottom:6,fontWeight:700}}>⚡ Szybkie dodanie</div>
+                {topFreq.length>0&&<>
+                  <div style={{fontSize:10,color:"var(--muted)",marginBottom:5}}>🔥 Najczęstsze</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5,marginBottom:8}}>
+                    {topFreq.map((m,i)=><Chip key={i} m={m} badge={`${freq[m.name]}×`}/>)}
+                  </div>
+                </>}
+                {recentUniq.length>0&&<>
+                  <div style={{fontSize:10,color:"var(--muted)",marginBottom:5}}>🕒 Ostatnio dodane</div>
+                  <div style={{display:"flex",flexWrap:"wrap",gap:5}}>
+                    {recentUniq.map((m,i)=><Chip key={i} m={m}/>)}
+                  </div>
+                </>}
               </div>
             );
           })()}
