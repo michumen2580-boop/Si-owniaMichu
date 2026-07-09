@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.7.0";
+const APP_VERSION = "4.7.3";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -531,7 +531,7 @@ function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,
           ))}
         </div>
         {stab==="general" && <>
-        {[{k:"vibration",e:"📳",l:"Wibracja"},{k:"notifications",e:"🔔",l:"Powiadomienia"},{k:"darkMode",e:"🌙",l:"Tryb ciemny"}].map(({k,e,l})=>(
+        {[{k:"vibration",e:"📳",l:"Wibracja"},{k:"darkMode",e:"🌙",l:"Tryb ciemny"}].map(({k,e,l})=>(
           <div key={k} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"14px 0",borderBottom:"1px solid var(--border)"}}>
             <span style={{fontSize:15}}>{e} {l}</span>
             <div onClick={()=>tog(k)} style={{width:48,height:26,borderRadius:13,background:settings[k]?"#ef4444":"#333",cursor:"pointer",position:"relative",transition:"background .2s"}}>
@@ -539,6 +539,34 @@ function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,
             </div>
           </div>
         ))}
+        {/* Powiadomienia z wyborem godziny */}
+        <div style={{padding:"14px 0",borderBottom:"1px solid var(--border)"}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span style={{fontSize:15}}>🔔 Powiadomienia</span>
+            <div onClick={()=>{
+              const newVal=!settings.notifications;
+              setSettings(p=>({...p,notifications:newVal}));
+              if(newVal&&"Notification" in window){
+                Notification.requestPermission().then(perm=>{
+                  if(perm!=="granted"){setSettings(p=>({...p,notifications:false}));alert("❌ Brak zgody na powiadomienia w przeglądarce");}
+                  else alert("✅ Powiadomienia włączone! Działają gdy aplikacja jest otwarta.");
+                });
+              }
+            }} style={{width:48,height:26,borderRadius:13,background:settings.notifications?"#ef4444":"#333",cursor:"pointer",position:"relative",transition:"background .2s"}}>
+              <div style={{position:"absolute",top:3,left:settings.notifications?24:3,width:20,height:20,borderRadius:"50%",background:"#fff",transition:"left .2s"}}/>
+            </div>
+          </div>
+          {settings.notifications&&(
+            <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginTop:12}}>
+              <span style={{fontSize:13,color:"var(--muted2)"}}>⏰ Godzina przypomnienia</span>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <button onClick={()=>setSettings(p=>({...p,notifHour:Math.max(6,(p.notifHour||20)-1)}))} style={{width:28,height:28,borderRadius:6,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",cursor:"pointer",fontSize:16}}>−</button>
+                <span style={{fontFamily:"'Bebas Neue'",fontSize:22,minWidth:40,textAlign:"center"}}>{settings.notifHour||20}:00</span>
+                <button onClick={()=>setSettings(p=>({...p,notifHour:Math.min(23,(p.notifHour||20)+1)}))} style={{width:28,height:28,borderRadius:6,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",cursor:"pointer",fontSize:16}}>+</button>
+              </div>
+            </div>
+          )}
+        </div>
         <div style={{marginTop:16,marginBottom:8,fontSize:13,fontWeight:700,color:"var(--muted2)",letterSpacing:.5}}>CELE AKTYWNOŚCI / DZIEŃ</div>
         {[
           {k:"stepGoal", e:"👟", l:"Cel kroków", min:1000, step:1000, unit:"kroków"},
@@ -598,7 +626,50 @@ function SettingsModal({settings,setSettings,weeklyGoals,setWeeklyGoals,history,
   a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 }}>📊 Eksport CSV (Arkusz)</button>
-          <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>{ const d=JSON.stringify({history,dayLogs,exportDate:today()}); const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([d],{type:"application/json"})); a.download="gymtracker-backup.json"; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000); }}>📤 Backup JSON</button>
+          <button className="btn btn-ghost" style={{width:"100%",marginBottom:6}} onClick={()=>{
+            const meals = storage.get("meals",[]);
+            const bodyWeight = storage.get("bodyWeight",[]);
+            const appSettings = storage.get("appSettings",{});
+            const d=JSON.stringify({exerciseDB:history.reduce((acc,e)=>acc,{}),dayLogs,meals,bodyWeight,appSettings,exportDate:today(),version:"full-v1"});
+            // Actually export full exerciseDB from storage
+            const fullExport = JSON.stringify({
+              dayLogs,
+              meals: storage.get("meals",[]),
+              bodyWeight: storage.get("bodyWeight",[]),
+              appSettings: storage.get("appSettings",{}),
+              exerciseDB: storage.get("exerciseDB",{}),
+              exportDate: today(),
+              version: "full-v1"
+            });
+            const a=document.createElement("a");
+            a.href=URL.createObjectURL(new Blob([fullExport],{type:"application/json"}));
+            a.download=`gymtracker-backup-${today()}.json`;
+            a.click();
+            setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+          }}>📤 Pełny backup (JSON)</button>
+          <button className="btn btn-ghost" style={{width:"100%"}} onClick={()=>{
+            const input=document.createElement("input");
+            input.type="file"; input.accept=".json";
+            input.onchange=e=>{
+              const f=e.target.files[0]; if(!f) return;
+              const r=new FileReader();
+              r.onload=ev=>{
+                try {
+                  const data=JSON.parse(ev.target.result);
+                  if(data.version==="full-v1"||data.dayLogs||data.exerciseDB){
+                    if(data.dayLogs) storage.set("dayLogs",data.dayLogs);
+                    if(data.meals) storage.set("meals",data.meals);
+                    if(data.bodyWeight) storage.set("bodyWeight",data.bodyWeight);
+                    if(data.exerciseDB) storage.set("exerciseDB",data.exerciseDB);
+                    if(data.appSettings) storage.set("appSettings",data.appSettings);
+                    alert("✅ Import zakończony! Odśwież aplikację.");
+                  } else { alert("❌ Nieznany format pliku"); }
+                } catch { alert("❌ Błąd odczytu pliku"); }
+              };
+              r.readAsText(f);
+            };
+            input.click();
+          }}>📥 Importuj backup</button>
           <button className="btn btn-ghost" style={{width:"100%",color:"#ef4444",borderColor:"#ef444433"}} onClick={()=>{ if(confirm("Resetować wszystkie dane?")){ localStorage.clear(); window.location.reload(); } }}>🗑️ Resetuj dane</button>
         </div>
         </>}
@@ -1545,6 +1616,8 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
   const [geminiKeyInput, setGeminiKeyInput] = useState("");
 
   const [histTab,setHistTab]   = useState("today");
+  const [pastAddDay,setPastAddDay] = useState(null); // ds dnia do którego dodajemy posiłek
+  const [pastMeal,setPastMeal]   = useState({name:"",kcal:"",protein:"",carbs:"",fat:""});
   useEffect(()=>{ storage.set("meals",meals); },[meals]);
   const todayStr=today();
   const todayMeals=meals.filter(m=>m.date===todayStr);
@@ -1995,7 +2068,25 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
               </div>
             ))}
           </div>
-          <button className="btn btn-red" onClick={saveMeal}>✓ Zapisz posiłek</button>
+          {(()=>{
+            const recent=[...meals].filter(m=>m.name&&m.kcal).reduce((acc,m)=>{if(!acc.find(x=>x.name===m.name))acc.push(m);return acc;},[]).slice(-8).reverse();
+            if(!recent.length) return null;
+            return (
+              <div style={{marginTop:10}}>
+                <div style={{fontSize:11,color:"var(--muted)",marginBottom:6}}>⚡ Szybkie dodanie:</div>
+                <div style={{display:"flex",flexWrap:"wrap",gap:6}}>
+                  {recent.map((m,i)=>(
+                    <button key={i} onClick={()=>{
+                      setMeals(p=>[{id:Date.now(),date:todayStr,name:m.name,kcal:m.kcal,protein:m.protein||0,carbs:m.carbs||0,fat:m.fat||0,time:new Date().toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})},...p]);
+                    }} style={{padding:"5px 10px",borderRadius:20,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--muted2)",fontSize:11,cursor:"pointer"}}>
+                      <strong>{m.name}</strong> <span style={{color:"var(--muted)"}}>{m.kcal} kcal</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
+          <button className="btn btn-red" onClick={saveMeal} style={{marginTop:10}}>✓ Zapisz posiłek</button>
         </div>
       )}
       <div style={{display:"flex",gap:8,margin:"4px 16px 8px"}}>
@@ -2021,9 +2112,20 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
           <div key={ds} className="card" style={{marginBottom:8}}>
             <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
               <span style={{fontWeight:700,fontSize:13}}>{fmt(ds)}</span>
-              <span style={{fontFamily:"'Bebas Neue'",fontSize:20,color:dk>goalKcal?"#ef4444":"#22c55e"}}>{dk} kcal</span>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span style={{fontFamily:"'Bebas Neue'",fontSize:20,color:dk>goalKcal?"#ef4444":"#22c55e"}}>{dk} kcal</span>
+                <button onClick={()=>setPastAddDay(ds)} style={{background:"#22c55e22",border:"1px solid #22c55e44",borderRadius:8,padding:"4px 10px",color:"#22c55e",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Dodaj</button>
+              </div>
             </div>
-            {dm.map(m=><div key={m.id} style={{display:"flex",justifyContent:"space-between",padding:"4px 0",borderTop:"1px solid var(--border)"}}><span style={{fontSize:12,color:"var(--muted2)"}}>{m.name}</span><span style={{fontSize:12,color:"var(--muted)"}}>{m.kcal} kcal</span></div>)}
+            {dm.map(m=>(
+              <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderTop:"1px solid var(--border)"}}>
+                <span style={{fontSize:12,color:"var(--muted2)"}}>{m.name}</span>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontSize:12,color:"var(--muted)"}}>{m.kcal} kcal</span>
+                  <button onClick={()=>setMeals(p=>p.filter(x=>x.id!==m.id))} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:14,padding:"0 2px"}}>×</button>
+                </div>
+              </div>
+            ))}
             {(()=>{
               const dp=dm.reduce((s,m)=>s+(m.protein||0),0);
               const dc=dm.reduce((s,m)=>s+(m.carbs||0),0);
@@ -2041,6 +2143,47 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
             })()}
           </div>
         )}):<div style={{textAlign:"center",padding:24,color:"var(--muted)",fontSize:13}}>Brak historii</div>
+      )}
+      {/* MODAL: DODAJ POSIŁEK DO POPRZEDNIEGO DNIA */}
+      {pastAddDay&&(
+        <div className="modal-bg" onClick={()=>setPastAddDay(null)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-handle"/>
+            <div className="modal-title">➕ Dodaj do {fmt(pastAddDay)}</div>
+            <div style={{display:"flex",flexDirection:"column",gap:10,marginBottom:16}}>
+              {[
+                {k:"name",l:"Nazwa posiłku",pl:"np. Kurczak z ryżem",type:"text"},
+                {k:"kcal",l:"🔥 Kalorie",pl:"500",type:"number"},
+                {k:"protein",l:"🥩 Białko (g)",pl:"30",type:"number"},
+                {k:"carbs",l:"🍞 Węgle (g)",pl:"60",type:"number"},
+                {k:"fat",l:"🧈 Tłuszcze (g)",pl:"15",type:"number"},
+              ].map(({k,l,pl,type})=>(
+                <div key={k}>
+                  <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>{l}</div>
+                  <input className="inp" type={type} placeholder={pl}
+                    value={pastMeal[k]}
+                    onChange={e=>setPastMeal(p=>({...p,[k]:e.target.value}))}
+                    style={{width:"100%"}}/>
+                </div>
+              ))}
+            </div>
+            <button className="btn btn-red" onClick={()=>{
+              if(!pastMeal.name||!pastMeal.kcal) return;
+              const meal={
+                id:Date.now(),
+                date:pastAddDay,
+                name:pastMeal.name,
+                kcal:Number(pastMeal.kcal)||0,
+                protein:Number(pastMeal.protein)||0,
+                carbs:Number(pastMeal.carbs)||0,
+                fat:Number(pastMeal.fat)||0,
+              };
+              setMeals(p=>[...p,meal]);
+              setPastMeal({name:"",kcal:"",protein:"",carbs:"",fat:""});
+              setPastAddDay(null);
+            }}>💾 Zapisz posiłek</button>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -2480,8 +2623,9 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
               <path d={[`M 0 ${chartH-((wSorted[0].val-minBW)/bwR)*chartH}`,...wSorted.slice(1).map((_,i)=>`L ${((i+1)/bwPts)*100} ${chartH-((wSorted[i+1].val-minBW)/bwR)*chartH}`),`L 100 ${chartH}`,`L 0 ${chartH}`,"Z"].join(" ")} fill="url(#bwg)"/>
               <polyline points={wSorted.map((w,i)=>`${(i/bwPts)*100},${chartH-((w.val-minBW)/bwR)*chartH}`).join(" ")} fill="none" stroke="#3b82f6" strokeWidth="1.5"/>
               {wSorted.map((w,i)=><circle key={i} cx={(i/bwPts)*100} cy={chartH-((w.val-minBW)/bwR)*chartH} r="2" fill="#3b82f6"/>)}
-              <text x="0" y={chartH+18} fontSize="7" fill="var(--muted)">{minBW}kg</text>
-              <text x="100" y={chartH+18} fontSize="7" fill="var(--muted)" textAnchor="end">{maxBW}kg</text>
+              <text x="0" y={chartH+18} fontSize="7" fill="var(--muted)">{fmt(wSorted[0].date)}</text>
+              <text x="50" y={chartH+18} fontSize="7" fill="var(--muted)" textAnchor="middle">{minBW}–{maxBW}kg</text>
+              <text x="100" y={chartH+18} fontSize="7" fill="var(--muted)" textAnchor="end">{fmt(wSorted[wSorted.length-1].date)}</text>
             </svg>
           )}
           {[...wSorted].reverse().slice(0,8).map((w,i,arr)=>{ const prev=arr[i+1]; const diff=prev?+(w.val-prev.val).toFixed(1):0; return (
