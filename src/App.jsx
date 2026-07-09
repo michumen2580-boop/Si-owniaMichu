@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.7.5";
+const APP_VERSION = "4.7.6";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1490,8 +1490,8 @@ function CardioView({onBack,saveDay,todayStr}) {
   const [level,setLevel]=useState("4"); // schody - poziom
   const [running,setRunning]=useState(false);
   const [elapsed,setElapsed]=useState(0);
+  const [manualHour,setManualHour]=useState(""); // ręczne godziny
   const [manualMin,setManualMin]=useState(""); // ręczne minuty
-  const [manualSec,setManualSec]=useState(""); // ręczne sekundy
   const [useManual,setUseManual]=useState(false);
   const [saved,setSaved]=useState(false);
   useEffect(()=>{ if(!running)return; const t=setInterval(()=>setElapsed(e=>e+1),1000); return()=>clearInterval(t); },[running]);
@@ -1499,7 +1499,7 @@ function CardioView({onBack,saveDay,todayStr}) {
 
   const getFinalElapsed = () => {
     if(useManual||elapsed===0) {
-      return (parseInt(manualMin)||0)*60 + (parseInt(manualSec)||0);
+      return (parseInt(manualHour)||0)*3600 + (parseInt(manualMin)||0)*60;
     }
     return elapsed;
   };
@@ -1543,17 +1543,17 @@ function CardioView({onBack,saveDay,todayStr}) {
           ) : (
             <div style={{display:"flex",alignItems:"center",justifyContent:"center",gap:12,marginTop:4}}>
               <div style={{textAlign:"center"}}>
-                <input type="number" min="0" max="300" placeholder="42" value={manualMin}
-                  onChange={e=>setManualMin(e.target.value)}
+                <input type="number" min="0" max="23" placeholder="0" value={manualHour}
+                  onChange={e=>setManualHour(e.target.value)}
                   style={{width:72,background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 8px",color:"var(--text)",fontFamily:"'Bebas Neue'",fontSize:32,textAlign:"center",outline:"none"}}/>
-                <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>min</div>
+                <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>godz</div>
               </div>
               <div style={{fontFamily:"'Bebas Neue'",fontSize:32,color:"var(--muted)"}}>:</div>
               <div style={{textAlign:"center"}}>
-                <input type="number" min="0" max="59" placeholder="30" value={manualSec}
-                  onChange={e=>setManualSec(e.target.value)}
+                <input type="number" min="0" max="59" placeholder="30" value={manualMin}
+                  onChange={e=>setManualMin(e.target.value)}
                   style={{width:72,background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 8px",color:"var(--text)",fontFamily:"'Bebas Neue'",fontSize:32,textAlign:"center",outline:"none"}}/>
-                <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>sek</div>
+                <div style={{fontSize:11,color:"var(--muted)",marginTop:4}}>min</div>
               </div>
             </div>
           )}
@@ -2360,7 +2360,7 @@ function ScreenCalendar({history,exerciseDB={},dayLogs,workoutDates,weeklyGoals,
                 const sessions = log.cardioSessions||(log.cardio?[log.cardio]:[]);
                 if(!sessions.length) return null;
                 const actLabel = t=>t==="walk"?"🚶 Spacer":t==="treadmill"?"🏃 Bieżnia":"🪜 Schody";
-                    const fmtDur = s=>s>0?`${Math.floor(s/60)} min${s%60>0?` ${s%60} sek`:""}`:"–";
+                    const fmtDur = s=>{ if(!s) return '–'; const h=Math.floor(s/3600); const m=Math.floor((s%3600)/60); return h>0?`${h}h ${m}min`:`${m} min`; };
                 return (
                   <div style={{background:"#eab30822",borderRadius:10,padding:"10px 12px",marginBottom:10}}>
                     <div style={{fontSize:11,fontWeight:700,color:"#eab308",marginBottom:8}}>🏃 CARDIO ({sessions.length}x)</div>
