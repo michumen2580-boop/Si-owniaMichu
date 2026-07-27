@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.7.6";
+const APP_VERSION = "4.7.7";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -824,14 +824,15 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
           const STEP_GOAL = settings?.stepGoal||10000;
           const KCAL_GOAL_W = settings?.kcalGoal||1000;
           const now = new Date();
-          const dow = now.getDay();
-          const mondayOffset = dow===0?-6:1-dow;
-          const monday = new Date(now); monday.setDate(now.getDate()+mondayOffset);
+          // Ostatnie 7 dni (nie bieżący tydzień od poniedziałku)
           const week7 = Array.from({length:7},(_,i)=>{
-            const d=new Date(monday); d.setDate(monday.getDate()+i);
+            const d=new Date(now); d.setDate(now.getDate()-6+i);
             return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
           });
-          const DAY_LABELS = ["Pn","Wt","Śr","Cz","Pt","Sb","Nd"];
+          const DAY_LABELS = week7.map(ds=>{
+            const d=new Date(ds);
+            return ["Nd","Pn","Wt","Śr","Cz","Pt","Sb"][d.getDay()];
+          });
           const weekSteps = week7.map(ds=>({ds, steps:dayLogs[ds]?.steps||0}));
           const totalWeek = weekSteps.reduce((s,d)=>s+d.steps,0);
           const maxSteps = Math.max(...weekSteps.map(d=>d.steps), STEP_GOAL);
@@ -1623,7 +1624,8 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
   const todayMeals=meals.filter(m=>m.date===todayStr);
   const totalKcal=todayMeals.reduce((s,m)=>s+(m.kcal||0),0);
   const pct=Math.min(100,Math.round((totalKcal/goalKcal)*100));
-  const last7=Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-6+i); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; const label=["Pn","Wt","Śr","Cz","Pt","So","Nd"][d.getDay()===0?6:d.getDay()-1]; return{ds,label,kcal:meals.filter(m=>m.date===ds).reduce((s,m)=>s+(m.kcal||0),0)}; });
+  const [chartOffset,setChartOffset] = useState(0); // 0=bieżący, 1=tydzień temu itd.
+  const last7=Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-6+i-chartOffset*7); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; const label=["Nd","Pn","Wt","Śr","Cz","Pt","Sb"][d.getDay()]; return{ds,label,kcal:meals.filter(m=>m.date===ds).reduce((s,m)=>s+(m.kcal||0),0)}; });
   const maxK=Math.max(...last7.map(d=>d.kcal),goalKcal,1);
   const handleImg=(e)=>{ const f=e.target.files[0]; if(!f)return; const r=new FileReader(); r.onload=(ev)=>{ setImgPrev(ev.target.result); /* don't auto-analyze - wait for user to add desc and click Analizuj */ }; r.readAsDataURL(f); };
 
@@ -1810,7 +1812,14 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
       })()}
 
       <div className="card">
-        <div className="ctitle">Kalorie – 7 dni</div>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <button onClick={()=>setChartOffset(o=>o+1)} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:8,width:32,height:32,cursor:"pointer",color:"var(--text)",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>◀</button>
+          <div style={{textAlign:"center"}}>
+            <div className="ctitle" style={{margin:0}}>Kalorie – 7 dni</div>
+            {chartOffset>0&&<div style={{fontSize:10,color:"var(--muted)"}}>{chartOffset===1?"poprzedni tydzień":`${chartOffset} tygodnie temu`}</div>}
+          </div>
+          <button onClick={()=>setChartOffset(o=>Math.max(0,o-1))} disabled={chartOffset===0} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:8,width:32,height:32,cursor:chartOffset===0?"default":"pointer",color:chartOffset===0?"var(--border)":"var(--text)",fontSize:18,display:"flex",alignItems:"center",justifyContent:"center"}}>▶</button>
+        </div>
         <div style={{display:"flex",alignItems:"flex-end",gap:4,height:80,marginBottom:4}}>
           {last7.map((d,i)=>{ const h=Math.max(4,(d.kcal/maxK)*76); const isT=d.ds===todayStr; const over=d.kcal>goalKcal; return (
             <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",gap:2}}>
@@ -2520,7 +2529,7 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
       </div>
 
       <div style={{display:"flex",gap:6,margin:"0 16px 12px",overflowX:"auto"}}>
-        {[{id:"muscle_last",label:"💪 Partie"},{id:"exercises",label:"📈 Ćwiczenia"},{id:"body",label:"⚖️ Sylwetka"},{id:"week",label:"📅 Tygodnie"}].map(t=>(
+        {[{id:"muscle_last",label:"💪 Partie"},{id:"exercises",label:"📈 Ćwiczenia"},{id:"body",label:"⚖️ Sylwetka"},{id:"week",label:"📅 Tygodnie"},{id:"steps",label:"👟 Kroki"},{id:"kcal",label:"🔥 Kalorie"}].map(t=>(
           <button key={t.id} onClick={()=>setActiveTab(t.id)} style={{flexShrink:0,padding:"8px 14px",borderRadius:10,border:`1.5px solid ${activeTab===t.id?"#ef4444":"var(--border)"}`,background:activeTab===t.id?"#ef444422":"var(--card2)",color:activeTab===t.id?"#ef4444":"var(--muted)",fontWeight:700,fontSize:12,cursor:"pointer"}}>{t.label}</button>
         ))}
       </div>
@@ -2743,6 +2752,194 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
                 </div>
               );
             })}
+          </div>
+        );
+      })()}
+
+      {/* ── ZAKŁADKA: KROKI ─────────────────────────────────────────── */}
+      {activeTab==="steps"&&(()=>{
+        const STEP_GOAL = 10000; // bierzemy domyślnie, settings tu niedostępne
+        const days30 = Array.from({length:30},(_,i)=>{
+          const d=new Date(); d.setDate(d.getDate()-29+i);
+          const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+          return {ds, steps:dayLogs[ds]?.steps||0, d};
+        });
+        const maxSteps = Math.max(...days30.map(d=>d.steps), STEP_GOAL, 1);
+        const totalSteps = days30.reduce((s,d)=>s+d.steps,0);
+        const avgSteps = Math.round(totalSteps/30);
+        const daysWithData = days30.filter(d=>d.steps>0);
+        const avgActive = daysWithData.length>0 ? Math.round(daysWithData.reduce((s,d)=>s+d.steps,0)/daysWithData.length) : 0;
+        const bestDay = days30.reduce((best,d)=>d.steps>best.steps?d:best, {steps:0,ds:""});
+        const goalDays = days30.filter(d=>d.steps>=STEP_GOAL).length;
+        // Streak obecny
+        let streak=0;
+        for(let i=days30.length-1;i>=0;i--){
+          if(days30[i].steps>=STEP_GOAL) streak++;
+          else break;
+        }
+        return (
+          <div>
+            {/* Podsumowanie */}
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+              {[
+                ["👟 Średnia / dzień", avgActive>0?avgActive.toLocaleString()+" kr":"–", avgActive>=STEP_GOAL?"#22c55e":"var(--text)"],
+                ["🏆 Rekord", bestDay.steps>0?bestDay.steps.toLocaleString()+" kr":"–", "#eab308"],
+                ["🎯 Dni z celem", `${goalDays}/30`, goalDays>=20?"#22c55e":goalDays>=10?"#eab308":"#ef4444"],
+                ["🔥 Streak", streak>0?`${streak} dni`:"–", streak>=7?"#22c55e":streak>=3?"#eab308":"var(--muted)"],
+              ].map(([l,v,c])=>(
+                <div key={l} className="card" style={{textAlign:"center",padding:"10px 8px"}}>
+                  <div style={{fontFamily:"'Bebas Neue'",fontSize:22,color:c}}>{v}</div>
+                  <div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>{l}</div>
+                </div>
+              ))}
+            </div>
+            {/* Procent realizacji */}
+            <div className="card" style={{marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                <span style={{fontSize:12,color:"var(--muted2)",fontWeight:700}}>Cel 10 000 kr – realizacja</span>
+                <span style={{fontSize:13,fontWeight:700,color:goalDays>=20?"#22c55e":"#eab308"}}>{Math.round(goalDays/30*100)}%</span>
+              </div>
+              <div style={{background:"var(--border)",borderRadius:6,height:10}}>
+                <div style={{height:"100%",borderRadius:6,background:goalDays>=20?"#22c55e":"#eab308",width:`${Math.round(goalDays/30*100)}%`}}/>
+              </div>
+              <div style={{fontSize:10,color:"var(--muted)",marginTop:4}}>{goalDays} z 30 dni z osiągniętym celem</div>
+            </div>
+            {/* Wykres 30 dni */}
+            <div className="card">
+              <div className="ctitle">Kroki – 30 dni</div>
+              {/* Linia średniej */}
+              <div style={{position:"relative"}}>
+                <div style={{display:"flex",alignItems:"flex-end",gap:2,height:80,marginBottom:4}}>
+                  {days30.map((d,i)=>{
+                    const h=d.steps>0?Math.max(3,Math.round((d.steps/maxSteps)*76)):3;
+                    const isT=d.ds===days30[days30.length-1].ds;
+                    const isBest=d.ds===bestDay.ds&&bestDay.steps>0;
+                    const ok=d.steps>=STEP_GOAL;
+                    return (
+                      <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
+                        <div style={{width:"100%",height:h,borderRadius:2,
+                          background:d.steps===0?"var(--border)":isBest?"#eab308":ok?"#22c55e":"#ef4444",
+                          opacity:d.steps===0?0.3:1,
+                          border:isT?"1px solid var(--text)":"none"}}/>
+                      </div>
+                    );
+                  })}
+                </div>
+                {/* Linia średniej */}
+                {avgActive>0&&<div style={{position:"absolute",bottom:`${Math.round((avgActive/maxSteps)*76)+4}px`,left:0,right:0,height:1,background:"#3b82f6",opacity:0.5}}/>}
+              </div>
+              {/* Etykiety co 5 dni */}
+              <div style={{display:"flex",gap:2}}>
+                {days30.map((d,i)=>(
+                  <div key={i} style={{flex:1,textAlign:"center",fontSize:7,color:"var(--muted)"}}>
+                    {i%5===0?String(d.d.getDate()).padStart(2,"0"):""}
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:12,marginTop:6,fontSize:10,color:"var(--muted)",flexWrap:"wrap"}}>
+                <span><span style={{color:"#22c55e"}}>■</span> ≥ cel</span>
+                <span><span style={{color:"#ef4444"}}>■</span> &lt; cel</span>
+                <span><span style={{color:"#eab308"}}>■</span> rekord</span>
+                <span><span style={{color:"#3b82f6"}}>—</span> średnia {avgActive.toLocaleString()}</span>
+              </div>
+            </div>
+            {bestDay.steps>0&&<div className="card" style={{marginTop:8}}>
+              <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>🏆 Najlepszy dzień</div>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontWeight:700}}>{bestDay.ds.split("-").reverse().join(".")}</span>
+                <span style={{fontFamily:"'Bebas Neue'",fontSize:20,color:"#eab308"}}>{bestDay.steps.toLocaleString()} kroków</span>
+              </div>
+            </div>}
+          </div>
+        );
+      })()}
+
+      {/* ── ZAKŁADKA: KALORIE AKTYWNE ───────────────────────────────── */}
+      {activeTab==="kcal"&&(()=>{
+        const KCAL_GOAL = 1000;
+        const days30 = Array.from({length:30},(_,i)=>{
+          const d=new Date(); d.setDate(d.getDate()-29+i);
+          const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+          return {ds, kcal:dayLogs[ds]?.calories||0, d};
+        });
+        const maxKcal = Math.max(...days30.map(d=>d.kcal), KCAL_GOAL, 1);
+        const daysWithData = days30.filter(d=>d.kcal>0);
+        const avgKcal = daysWithData.length>0 ? Math.round(daysWithData.reduce((s,d)=>s+d.kcal,0)/daysWithData.length) : 0;
+        const bestDay = days30.reduce((best,d)=>d.kcal>best.kcal?d:best, {kcal:0,ds:""});
+        const goalDays = days30.filter(d=>d.kcal>=KCAL_GOAL).length;
+        const totalKcal = days30.reduce((s,d)=>s+d.kcal,0);
+        let streak=0;
+        for(let i=days30.length-1;i>=0;i--){
+          if(days30[i].kcal>=KCAL_GOAL) streak++;
+          else break;
+        }
+        return (
+          <div>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:12}}>
+              {[
+                ["🔥 Średnia / dzień", avgKcal>0?avgKcal+" kcal":"–", avgKcal>=KCAL_GOAL?"#22c55e":"var(--text)"],
+                ["🏆 Rekord", bestDay.kcal>0?bestDay.kcal+" kcal":"–", "#eab308"],
+                ["🎯 Dni z celem", `${goalDays}/30`, goalDays>=20?"#22c55e":goalDays>=10?"#eab308":"#ef4444"],
+                ["🔥 Streak", streak>0?`${streak} dni`:"–", streak>=7?"#22c55e":streak>=3?"#eab308":"var(--muted)"],
+              ].map(([l,v,c])=>(
+                <div key={l} className="card" style={{textAlign:"center",padding:"10px 8px"}}>
+                  <div style={{fontFamily:"'Bebas Neue'",fontSize:22,color:c}}>{v}</div>
+                  <div style={{fontSize:10,color:"var(--muted)",marginTop:2}}>{l}</div>
+                </div>
+              ))}
+            </div>
+            <div className="card" style={{marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",marginBottom:6}}>
+                <span style={{fontSize:12,color:"var(--muted2)",fontWeight:700}}>Cel {KCAL_GOAL} kcal – realizacja</span>
+                <span style={{fontSize:13,fontWeight:700,color:goalDays>=20?"#22c55e":"#eab308"}}>{Math.round(goalDays/30*100)}%</span>
+              </div>
+              <div style={{background:"var(--border)",borderRadius:6,height:10}}>
+                <div style={{height:"100%",borderRadius:6,background:goalDays>=20?"#22c55e":"#eab308",width:`${Math.round(goalDays/30*100)}%`}}/>
+              </div>
+              <div style={{fontSize:10,color:"var(--muted)",marginTop:4}}>{goalDays} z 30 dni z osiągniętym celem</div>
+            </div>
+            <div className="card">
+              <div className="ctitle">Kcal aktywne – 30 dni</div>
+              <div style={{position:"relative"}}>
+                <div style={{display:"flex",alignItems:"flex-end",gap:2,height:80,marginBottom:4}}>
+                  {days30.map((d,i)=>{
+                    const h=d.kcal>0?Math.max(3,Math.round((d.kcal/maxKcal)*76)):3;
+                    const isT=d.ds===days30[days30.length-1].ds;
+                    const isBest=d.ds===bestDay.ds&&bestDay.kcal>0;
+                    const ok=d.kcal>=KCAL_GOAL;
+                    return (
+                      <div key={i} style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center"}}>
+                        <div style={{width:"100%",height:h,borderRadius:2,
+                          background:d.kcal===0?"var(--border)":isBest?"#eab308":ok?"#22c55e":"#ef4444",
+                          opacity:d.kcal===0?0.3:1,
+                          border:isT?"1px solid var(--text)":"none"}}/>
+                      </div>
+                    );
+                  })}
+                </div>
+                {avgKcal>0&&<div style={{position:"absolute",bottom:`${Math.round((avgKcal/maxKcal)*76)+4}px`,left:0,right:0,height:1,background:"#3b82f6",opacity:0.5}}/>}
+              </div>
+              <div style={{display:"flex",gap:2}}>
+                {days30.map((d,i)=>(
+                  <div key={i} style={{flex:1,textAlign:"center",fontSize:7,color:"var(--muted)"}}>
+                    {i%5===0?String(d.d.getDate()).padStart(2,"0"):""}
+                  </div>
+                ))}
+              </div>
+              <div style={{display:"flex",gap:12,marginTop:6,fontSize:10,color:"var(--muted)",flexWrap:"wrap"}}>
+                <span><span style={{color:"#22c55e"}}>■</span> ≥ cel</span>
+                <span><span style={{color:"#ef4444"}}>■</span> &lt; cel</span>
+                <span><span style={{color:"#eab308"}}>■</span> rekord</span>
+                <span><span style={{color:"#3b82f6"}}>—</span> średnia {avgKcal} kcal</span>
+              </div>
+            </div>
+            {bestDay.kcal>0&&<div className="card" style={{marginTop:8}}>
+              <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>🏆 Najlepszy dzień</div>
+              <div style={{display:"flex",justifyContent:"space-between"}}>
+                <span style={{fontWeight:700}}>{bestDay.ds.split("-").reverse().join(".")}</span>
+                <span style={{fontFamily:"'Bebas Neue'",fontSize:20,color:"#eab308"}}>{bestDay.kcal} kcal</span>
+              </div>
+            </div>}
           </div>
         );
       })()}
