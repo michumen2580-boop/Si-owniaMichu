@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.7.7";
+const APP_VERSION = "4.7.8";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -2160,41 +2160,51 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
           </div>
         )):<div style={{textAlign:"center",padding:24,color:"var(--muted)",fontSize:13}}>Brak posiłków dzisiaj</div>
       ):(
-        histDates.length>0?histDates.map(ds=>{ const dm=meals.filter(m=>m.date===ds); const dk=dm.reduce((s,m)=>s+(m.kcal||0),0); return (
-          <div key={ds} className="card" style={{marginBottom:8}}>
-            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
-              <span style={{fontWeight:700,fontSize:13}}>{fmt(ds)}</span>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                <span style={{fontFamily:"'Bebas Neue'",fontSize:20,color:dk>goalKcal?"#ef4444":"#22c55e"}}>{dk} kcal</span>
-                <button onClick={()=>setPastAddDay(ds)} style={{background:"#22c55e22",border:"1px solid #22c55e44",borderRadius:8,padding:"4px 10px",color:"#22c55e",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Dodaj</button>
-              </div>
-            </div>
-            {dm.map(m=>(
-              <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderTop:"1px solid var(--border)"}}>
-                <span style={{fontSize:12,color:"var(--muted2)"}}>{m.name}</span>
-                <div style={{display:"flex",alignItems:"center",gap:8}}>
-                  <span style={{fontSize:12,color:"var(--muted)"}}>{m.kcal} kcal</span>
-                  <button onClick={()=>setMeals(p=>p.filter(x=>x.id!==m.id))} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:14,padding:"0 2px"}}>×</button>
-                </div>
-              </div>
-            ))}
-            {(()=>{
-              const dp=dm.reduce((s,m)=>s+(m.protein||0),0);
-              const dc=dm.reduce((s,m)=>s+(m.carbs||0),0);
-              const df=dm.reduce((s,m)=>s+(m.fat||0),0);
-              return (
-                <div style={{display:"flex",gap:6,marginTop:8,paddingTop:6,borderTop:"1px solid var(--border)"}}>
-                  {[["🥩",dp,"#ef4444"],["🍞",dc,"#eab308"],["🧈",df,"#3b82f6"]].map(([e,v,c])=>(
-                    <div key={e} style={{flex:1,textAlign:"center",background:"var(--card2)",borderRadius:8,padding:"4px 2px"}}>
-                      <div style={{fontSize:13,fontWeight:700,color:c}}>{v}g</div>
-                      <div style={{fontSize:10,color:"var(--muted)"}}>{e}</div>
-                    </div>
-                  ))}
-                </div>
-              );
-            })()}
+        <div>
+          {/* Przycisk dodania do dowolnego dnia */}
+          <div style={{marginBottom:10,display:"flex",alignItems:"center",gap:8}}>
+            <div style={{fontSize:12,color:"var(--muted)"}}>Dodaj posiłki do wybranego dnia:</div>
+            <input type="date"
+              max={new Date(new Date().setDate(new Date().getDate()-1)).toISOString().slice(0,10)}
+              onChange={e=>{ if(e.target.value) setPastAddDay(e.target.value); e.target.value=""; }}
+              style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:8,padding:"6px 10px",color:"var(--text)",fontSize:12,cursor:"pointer",flex:1}}/>
           </div>
-        )}):<div style={{textAlign:"center",padding:24,color:"var(--muted)",fontSize:13}}>Brak historii</div>
+          {histDates.length>0?histDates.map(ds=>{ const dm=meals.filter(m=>m.date===ds); const dk=dm.reduce((s,m)=>s+(m.kcal||0),0); return (
+            <div key={ds} className="card" style={{marginBottom:8}}>
+              <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                <span style={{fontWeight:700,fontSize:13}}>{fmt(ds)}</span>
+                <div style={{display:"flex",alignItems:"center",gap:8}}>
+                  <span style={{fontFamily:"'Bebas Neue'",fontSize:20,color:dk>goalKcal?"#ef4444":"#22c55e"}}>{dk} kcal</span>
+                  <button onClick={()=>setPastAddDay(ds)} style={{background:"#22c55e22",border:"1px solid #22c55e44",borderRadius:8,padding:"4px 10px",color:"#22c55e",fontSize:11,fontWeight:700,cursor:"pointer"}}>+ Dodaj</button>
+                </div>
+              </div>
+              {dm.map(m=>(
+                <div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"4px 0",borderTop:"1px solid var(--border)"}}>
+                  <span style={{fontSize:12,color:"var(--muted2)"}}>{m.name}</span>
+                  <div style={{display:"flex",alignItems:"center",gap:8}}>
+                    <span style={{fontSize:12,color:"var(--muted)"}}>{m.kcal} kcal</span>
+                    <button onClick={()=>setMeals(p=>p.filter(x=>x.id!==m.id))} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:14,padding:"0 2px"}}>×</button>
+                  </div>
+                </div>
+              ))}
+              {(()=>{
+                const dp=dm.reduce((s,m)=>s+(m.protein||0),0);
+                const dc=dm.reduce((s,m)=>s+(m.carbs||0),0);
+                const df=dm.reduce((s,m)=>s+(m.fat||0),0);
+                return (
+                  <div style={{display:"flex",gap:6,marginTop:8,paddingTop:6,borderTop:"1px solid var(--border)"}}>
+                    {[["🥩",dp,"#ef4444"],["🍞",dc,"#eab308"],["🧈",df,"#3b82f6"]].map(([e,v,c])=>(
+                      <div key={e} style={{flex:1,textAlign:"center",background:"var(--card2)",borderRadius:8,padding:"4px 2px"}}>
+                        <div style={{fontSize:13,fontWeight:700,color:c}}>{v}g</div>
+                        <div style={{fontSize:10,color:"var(--muted)"}}>{e}</div>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
+            </div>
+          )}):<div style={{textAlign:"center",padding:16,color:"var(--muted)",fontSize:13}}>Brak historii – wybierz datę powyżej aby dodać posiłki</div>}
+        </div>
       )}
       {/* MODAL: DODAJ POSIŁEK DO POPRZEDNIEGO DNIA */}
       {pastAddDay&&(
