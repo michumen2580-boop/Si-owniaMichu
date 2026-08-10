@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.7.8";
+const APP_VERSION = "4.7.9";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1615,6 +1615,31 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
   const [aiDesc,     setAiDesc]     = useState("");
   const [aiPrompt,   setAiPrompt]   = useState(false);
   const [geminiKeyInput, setGeminiKeyInput] = useState("");
+  const [showDB, setShowDB]         = useState(false);
+  const [dbSearch, setDbSearch]     = useState("");
+  const [editProduct, setEditProduct] = useState(null);
+  const [portionMult, setPortionMult] = useState({});
+  const DEFAULT_PRODUCTS = [
+    {id:"p1",  name:"Ciemna bułka proteinowa",    portion:"1 szt. (85g)",      kcal:215, protein:18.0, carbs:11.0, fat:10.0},
+    {id:"p2",  name:"Bułka grahamka",             portion:"1 szt. (70g)",      kcal:190, protein:6.0,  carbs:39.0, fat:1.2},
+    {id:"p3",  name:"Parówki Sokoliki",           portion:"paczka (140g)",     kcal:260, protein:21.7, carbs:2.4,  fat:18.2},
+    {id:"p4",  name:"Skyr pitny waniliowy",       portion:"butelka (360g)",    kcal:188, protein:26.0, carbs:24.0, fat:0.0},
+    {id:"p5",  name:"Płatki owsiane górskie",     portion:"50g",               kcal:188, protein:6.0,  carbs:31.5, fat:3.6},
+    {id:"p6",  name:"Sałatka lunchbox Gyros",     portion:"paczka (210g)",     kcal:155, protein:11.0, carbs:6.3,  fat:8.4},
+    {id:"p7",  name:"Twarożek ze szczypiorkiem",  portion:"150g",              kcal:172, protein:16.5, carbs:3.0,  fat:10.5},
+    {id:"p8",  name:"Serek kremowy lekki",        portion:"45g",               kcal:63,  protein:5.4,  carbs:2.2,  fat:3.6},
+    {id:"p9",  name:"Nabiał wysokobiałkowy",      portion:"paczka (250g)",     kcal:215, protein:45.0, carbs:8.8,  fat:0.0},
+    {id:"p10", name:"Jajko (gotowane/sadzone)",   portion:"1 szt. (L)",        kcal:75,  protein:7.0,  carbs:0.5,  fat:5.0},
+    {id:"p11", name:"Ser żółty",                  portion:"3 plastry (45g)",   kcal:150, protein:12.0, carbs:0.0,  fat:12.0},
+    {id:"p12", name:"Szynka / Wędlina",           portion:"3 plastry (45g)",   kcal:45,  protein:8.0,  carbs:1.0,  fat:1.0},
+    {id:"p13", name:"Pomidorki koktajlowe",       portion:"garść (100g)",      kcal:20,  protein:1.0,  carbs:4.0,  fat:0.2},
+    {id:"p14", name:"Ziemniaki ugotowane",        portion:"porcja (300g)",     kcal:225, protein:6.0,  carbs:51.0, fat:0.3},
+    {id:"p15", name:"Pierś z kurczaka pieczona",  portion:"200g",              kcal:198, protein:43.0, carbs:0.0,  fat:2.6},
+    {id:"p16", name:"Gołąbki bez zawijania",      portion:"2 duże (320g)",     kcal:450, protein:25.0, carbs:30.0, fat:25.0},
+    {id:"p17", name:"Czarna kawa z cukrem",       portion:"1 kubek (2 łyż.)",  kcal:40,  protein:0.0,  carbs:10.0, fat:0.0},
+  ];
+  const [productDB, setProductDB] = useState(()=>storage.get("productDB",null)||DEFAULT_PRODUCTS);
+  useEffect(()=>{ storage.set("productDB",productDB); },[productDB]);
 
   const [histTab,setHistTab]   = useState("today");
   const [pastAddDay,setPastAddDay] = useState(null); // ds dnia do którego dodajemy posiłek
@@ -1968,8 +1993,9 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
           </div>
         );
       })()}
-      <div style={{margin:"0 16px 12px"}}>
-        <button onClick={()=>setShowAdd(s=>!s)} className="btn btn-red" style={{background:showAdd?"#333":"#ef4444"}}>{showAdd?"✕ Anuluj":"+ Dodaj posiłek"}</button>
+      <div style={{margin:"0 16px 12px",display:"flex",gap:8}}>
+        <button onClick={()=>setShowAdd(s=>!s)} className="btn btn-red" style={{flex:2,background:showAdd?"#333":"#ef4444"}}>{showAdd?"✕ Anuluj":"+ Dodaj posiłek"}</button>
+        <button onClick={()=>{setShowDB(true);setDbSearch("");}} className="btn btn-red" style={{flex:1,background:"#7c3aed"}}>📋 Baza</button>
       </div>
       {showAdd&&(
         <div className="card">
@@ -2206,6 +2232,101 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
           )}):<div style={{textAlign:"center",padding:16,color:"var(--muted)",fontSize:13}}>Brak historii – wybierz datę powyżej aby dodać posiłki</div>}
         </div>
       )}
+      {/* MODAL: BAZA PRODUKTÓW */}
+      {showDB&&(
+        <div className="modal-bg" onClick={()=>{setShowDB(false);setEditProduct(null);}}>
+          <div className="modal" style={{maxHeight:"90vh",overflowY:"auto"}} onClick={e=>e.stopPropagation()}>
+            <div className="modal-handle"/>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+              <div className="modal-title" style={{margin:0}}>📋 Baza produktów</div>
+              <button onClick={()=>setEditProduct({id:"p"+Date.now(),name:"",portion:"",kcal:"",protein:"",carbs:"",fat:"",isNew:true})}
+                style={{background:"#22c55e22",border:"1px solid #22c55e44",borderRadius:8,padding:"6px 12px",color:"#22c55e",fontWeight:700,fontSize:12,cursor:"pointer"}}>+ Nowy</button>
+            </div>
+
+            {/* Wyszukiwarka */}
+            <input placeholder="🔍 Szukaj produktu..." value={dbSearch} onChange={e=>setDbSearch(e.target.value)}
+              style={{width:"100%",background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 12px",color:"var(--text)",fontSize:13,outline:"none",marginBottom:12,boxSizing:"border-box"}}/>
+
+            {/* Edycja / Dodawanie produktu */}
+            {editProduct&&(
+              <div style={{background:"var(--card2)",borderRadius:12,padding:12,marginBottom:12,border:"1px solid var(--border)"}}>
+                <div style={{fontWeight:700,fontSize:13,marginBottom:10,color:"var(--muted2)"}}>{editProduct.isNew?"➕ Nowy produkt":"✏️ Edycja"}</div>
+                {[
+                  {k:"name",l:"Nazwa",pl:"np. Pierś z kurczaka",type:"text"},
+                  {k:"portion",l:"Porcja",pl:"np. 200g",type:"text"},
+                  {k:"kcal",l:"🔥 Kalorie",pl:"0",type:"number"},
+                  {k:"protein",l:"🥩 Białko (g)",pl:"0",type:"number"},
+                  {k:"carbs",l:"🍞 Węgle (g)",pl:"0",type:"number"},
+                  {k:"fat",l:"🧈 Tłuszcze (g)",pl:"0",type:"number"},
+                ].map(({k,l,pl,type})=>(
+                  <div key={k} style={{marginBottom:8}}>
+                    <div style={{fontSize:10,color:"var(--muted)",marginBottom:3}}>{l}</div>
+                    <input type={type} placeholder={pl} value={editProduct[k]||""}
+                      onChange={e=>setEditProduct(p=>({...p,[k]:e.target.value}))}
+                      style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 10px",color:"var(--text)",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+                  </div>
+                ))}
+                <div style={{display:"flex",gap:8,marginTop:8}}>
+                  <button onClick={()=>{
+                    if(!editProduct.name||!editProduct.kcal) return;
+                    const prod={...editProduct,kcal:Number(editProduct.kcal)||0,protein:Number(editProduct.protein)||0,carbs:Number(editProduct.carbs)||0,fat:Number(editProduct.fat)||0};
+                    delete prod.isNew;
+                    setProductDB(p=>editProduct.isNew?[...p,prod]:p.map(x=>x.id===prod.id?prod:x));
+                    setEditProduct(null);
+                  }} style={{flex:1,background:"#22c55e",border:"none",borderRadius:8,padding:"10px",color:"#fff",fontWeight:700,cursor:"pointer"}}>💾 Zapisz</button>
+                  <button onClick={()=>setEditProduct(null)} style={{flex:1,background:"var(--card)",border:"1px solid var(--border)",borderRadius:8,padding:"10px",color:"var(--muted)",cursor:"pointer"}}>Anuluj</button>
+                </div>
+              </div>
+            )}
+
+            {/* Lista produktów */}
+            {productDB.filter(p=>!dbSearch||p.name.toLowerCase().includes(dbSearch.toLowerCase())).map(p=>{
+              const mult = portionMult[p.id]||1;
+              const kcalFinal = Math.round(p.kcal*mult);
+              return (
+                <div key={p.id} style={{borderBottom:"1px solid var(--border)",paddingBottom:10,marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+                    <div style={{flex:1}}>
+                      <div style={{fontWeight:700,fontSize:13}}>{p.name}</div>
+                      <div style={{fontSize:11,color:"var(--muted)"}}>{p.portion}</div>
+                    </div>
+                    <div style={{display:"flex",gap:6,alignItems:"center"}}>
+                      <button onClick={()=>setEditProduct({...p})} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:16,padding:"0 4px"}}>✏️</button>
+                      <button onClick={()=>{if(window.confirm(`Usunąć "${p.name}"?`)) setProductDB(db=>db.filter(x=>x.id!==p.id));}} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:16,padding:"0 4px"}}>🗑️</button>
+                    </div>
+                  </div>
+                  {/* Makro */}
+                  <div style={{display:"flex",gap:6,marginBottom:8}}>
+                    {[["🔥",kcalFinal,"kcal","#ef4444"],["🥩",Math.round(p.protein*mult)+"g","","#ef4444"],["🍞",Math.round(p.carbs*mult)+"g","","#eab308"],["🧈",Math.round(p.fat*mult)+"g","","#3b82f6"]].map(([e,v,u,c])=>(
+                      <div key={e} style={{flex:1,textAlign:"center",background:"var(--card2)",borderRadius:6,padding:"3px 2px"}}>
+                        <div style={{fontSize:12,fontWeight:700,color:c}}>{v}{u}</div>
+                        <div style={{fontSize:9,color:"var(--muted)"}}>{e}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Mnożnik porcji */}
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:6}}>
+                    <span style={{fontSize:11,color:"var(--muted)"}}>Porcje:</span>
+                    <button onClick={()=>setPortionMult(m=>({...m,[p.id]:Math.max(0.5,((m[p.id]||1)-0.5))}))} style={{width:26,height:26,borderRadius:6,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",cursor:"pointer",fontSize:14}}>−</button>
+                    <span style={{fontFamily:"'Bebas Neue'",fontSize:18,minWidth:28,textAlign:"center"}}>{mult}</span>
+                    <button onClick={()=>setPortionMult(m=>({...m,[p.id]:(m[p.id]||1)+0.5}))} style={{width:26,height:26,borderRadius:6,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",cursor:"pointer",fontSize:14}}>+</button>
+                    <span style={{fontSize:10,color:"var(--muted)"}}>× {p.portion}</span>
+                  </div>
+                  <button onClick={()=>{
+                    const meal={id:Date.now(),date:todayStr,name:p.name+(mult!==1?` ×${mult}`:""),kcal:kcalFinal,protein:Math.round(p.protein*mult),carbs:Math.round(p.carbs*mult),fat:Math.round(p.fat*mult),time:new Date().toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"})};
+                    setMeals(prev=>[meal,...prev]);
+                    setPortionMult(m=>({...m,[p.id]:1}));
+                  }} style={{width:"100%",background:"#ef4444",border:"none",borderRadius:8,padding:"8px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+                    ➕ Dodaj do dzisiejszego dnia
+                  </button>
+                </div>
+              );
+            })}
+            <button onClick={()=>{setShowDB(false);setEditProduct(null);}} className="btn btn-red" style={{width:"100%",marginTop:4}}>Zamknij</button>
+          </div>
+        </div>
+      )}
+
       {/* MODAL: DODAJ POSIŁEK DO POPRZEDNIEGO DNIA */}
       {pastAddDay&&(
         <div className="modal-bg" onClick={()=>setPastAddDay(null)}>
