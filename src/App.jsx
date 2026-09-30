@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.7.9";
+const APP_VERSION = "4.8.1";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -384,7 +384,7 @@ export default function App() {
     }
   });
 
-  const last7 = Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-6+i); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; return !!(dayLogs[ds]?.workoutType||dayLogs[ds]?.workoutTypes?.length||(workoutDates[ds]&&workoutDates[ds].length>0)); });
+  const last7 = Array.from({length:7},(_,i)=>{ const d=new Date(); d.setDate(d.getDate()-6+i); const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; return !!(dayLogs[ds]?.workoutType||dayLogs[ds]?.workoutTypes?.length||(workoutDates[ds]&&(Array.isArray(workoutDates[ds])?workoutDates[ds].length>0:true))); });
   const streak = (()=>{ let s=0,d=new Date(); for(let i=0;i<30;i++){ const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; if(dayLogs[ds]?.workoutType||dayLogs[ds]?.workoutTypes?.length||(workoutDates[ds]&&workoutDates[ds].length>0)) s++; else if(i>0) break; d.setDate(d.getDate()-1); } return s; })();
 
   const aiActive = !!(aiEnabled && geminiKey.trim());
@@ -399,7 +399,7 @@ export default function App() {
           {tab==="training" && <ScreenTraining {...sharedProps}/>}
           {tab==="diet"     && <ScreenDiet     {...sharedProps}/>}
           {tab==="calendar" && <ScreenCalendar {...sharedProps}/>}
-          {tab==="stats"    && <ScreenStats    {...sharedProps}/>}
+          {tab==="stats"    && <ScreenStats    {...sharedProps} settings={settings}/>}
         </div>
         <nav className="nav">
           {[{id:"today",n:"home",l:"Dziś"},{id:"training",n:"dumbbell",l:"Trening"},{id:"diet",n:"food",l:"Dieta"},{id:"calendar",n:"cal",l:"Kalendarz"},{id:"stats",n:"chart",l:"Statystyki"}].map(x=>(
@@ -945,6 +945,9 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
 function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,settings,customExercises,setCustomExercises,hiddenExercises,setHiddenExercises,workoutTemplates,setWorkoutTemplates}) {
   const [phase, setPhase]   = useState("select"); // select|session|cardio|exercises
   const [selType,setSelType]= useState(null);
+  const [showPast,setShowPast]= useState(false);
+  const [pastDate,setPastDate]= useState("");
+  const [pastType,setPastType]= useState("push");
   const [editEx, setEditEx] = useState(null); // {name,muscle,isCustom,originalName}
   const [showAdd,setShowAdd]= useState(false);
   const [newEx,  setNewEx]  = useState({name:"",muscle:"klata",trainings:[]});
@@ -1001,8 +1004,8 @@ function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,setti
     setEditEx(null);
   };
 
-  if(phase==="session") return <SessionView type={selType} history={history} exerciseDB={exerciseDB} setExerciseDB={setExerciseDB} todayStr={todayStr} onBack={()=>setPhase("select")} saveDay={saveDay} settings={settings} customExercises={customExercises} hiddenExercises={hiddenExercises} workoutTemplates={workoutTemplates}/>;
-  if(phase==="cardio")  return <CardioView onBack={()=>setPhase("select")} saveDay={saveDay} todayStr={todayStr}/>;
+  if(phase==="session") return <SessionView type={selType} history={history} exerciseDB={exerciseDB} setExerciseDB={setExerciseDB} todayStr={pastDate||todayStr} onBack={()=>{setPhase("select");setPastDate("");}} saveDay={saveDay} settings={settings} customExercises={customExercises} hiddenExercises={hiddenExercises} workoutTemplates={workoutTemplates}/>;
+  if(phase==="cardio")  return <CardioView onBack={()=>{setPhase("select");setPastDate("");}} saveDay={saveDay} todayStr={pastDate||todayStr} dayLogs={dayLogs}/>;
 
   return (
     <div className="anim">
@@ -1018,6 +1021,11 @@ function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,setti
       </div>
 
       {phase==="select" && <>
+        <div style={{margin:"0 16px 8px"}}>
+          <button onClick={()=>setShowPast(true)} style={{width:"100%",background:"var(--card2)",border:"1px solid var(--border)",borderRadius:12,padding:"12px",color:"var(--muted2)",fontWeight:700,fontSize:13,cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+            📅 Dodaj trening do poprzedniego dnia
+          </button>
+        </div>
         <div className="slabel">Typ treningu</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,margin:"0 16px 12px"}}>
           {[{id:"push",e:"🔴",n:"PUSH",d:"Klata·Barki·Triceps"},{id:"pull",e:"🔵",n:"PULL",d:"Plecy·Biceps"},{id:"fbw",e:"🟢",n:"FBW",d:"Full Body"},{id:"cardio",e:"🟡",n:"CARDIO",d:"Spacer·Bieżnia"}].map(t=>(
@@ -1240,6 +1248,42 @@ function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,setti
             <button className="btn btn-red" onClick={saveEditEx}>✓ Zapisz zmiany</button>
             <button className="btn btn-ghost" style={{width:"100%",marginTop:8,color:"#ef4444",borderColor:"#ef444433"}} onClick={deleteEx}>🗑️ Usuń ćwiczenie</button>
             <button className="btn btn-ghost" style={{width:"100%",marginTop:8}} onClick={()=>setEditEx(null)}>Anuluj</button>
+          </div>
+        </div>
+      )}
+      {/* MODAL: TRENING WSTECZ */}
+      {showPast&&(
+        <div className="modal-bg" onClick={()=>setShowPast(false)}>
+          <div className="modal" onClick={e=>e.stopPropagation()}>
+            <div className="modal-handle"/>
+            <div className="modal-title">📅 Trening wstecz</div>
+            <div style={{marginBottom:12}}>
+              <div style={{fontSize:11,color:"var(--muted)",marginBottom:6}}>Wybierz datę</div>
+              <input type="date"
+                max={new Date(new Date().setDate(new Date().getDate()-1)).toISOString().slice(0,10)}
+                value={pastDate}
+                onChange={e=>setPastDate(e.target.value)}
+                style={{width:"100%",background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,padding:"10px 12px",color:"var(--text)",fontSize:14,outline:"none",boxSizing:"border-box"}}/>
+            </div>
+            <div style={{marginBottom:16}}>
+              <div style={{fontSize:11,color:"var(--muted)",marginBottom:8}}>Typ treningu</div>
+              <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
+                {[{id:"push",l:"PUSH 🔴"},{id:"pull",l:"PULL 🔵"},{id:"fbw",l:"FBW 🟢"},{id:"cardio",l:"CARDIO 🟡"}].map(t=>(
+                  <button key={t.id} onClick={()=>setPastType(t.id)}
+                    style={{flex:1,minWidth:"40%",padding:"10px 8px",borderRadius:10,border:`1.5px solid ${pastType===t.id?"#ef4444":"var(--border)"}`,background:pastType===t.id?"#ef444422":"var(--card2)",color:pastType===t.id?"#ef4444":"var(--muted)",fontWeight:700,cursor:"pointer",fontSize:13}}>
+                    {t.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button className="btn btn-red" disabled={!pastDate} onClick={()=>{
+              if(!pastDate) return;
+              setShowPast(false);
+              setSelType(pastType);
+              setPhase(pastType==="cardio"?"cardio":"session");
+            }} style={{width:"100%",opacity:pastDate?1:0.5}}>
+              ▶ Rozpocznij sesję dla {pastDate?pastDate.split("-").reverse().join("."):"..."}
+            </button>
           </div>
         </div>
       )}
@@ -1485,7 +1529,7 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
 }
 
 // ── CARDIO VIEW ───────────────────────────────────────────────────────────────
-function CardioView({onBack,saveDay,todayStr}) {
+function CardioView({onBack,saveDay,todayStr,dayLogs={}}) {
   const [type,setType]=useState(null);
   const [km,setKm]=useState("");
   const [level,setLevel]=useState("4"); // schody - poziom
@@ -1727,7 +1771,7 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
     } catch(e){ alert("Błąd: "+e.message); setAiLoading(false); }
   };
   const saveMeal=()=>{ if(!newMeal.name)return; setMeals(p=>[{...newMeal,kcal:Number(newMeal.kcal)||0,protein:Number(newMeal.protein)||0,carbs:Number(newMeal.carbs)||0,fat:Number(newMeal.fat)||0,date:todayStr,time:new Date().toLocaleTimeString("pl-PL",{hour:"2-digit",minute:"2-digit"}),id:Date.now(),img:imgPrev},...p]); setNewMeal({name:"",kcal:"",protein:"",carbs:"",fat:""}); setImgPrev(null); setShowAdd(false); };
-  const histDates=[...new Set(meals.filter(m=>m.date!==todayStr).map(m=>m.date))].sort().reverse().slice(0,14);
+  const histDates=[...new Set(meals.filter(m=>m.date!==todayStr).map(m=>m.date))].sort().reverse().slice(0,30);
   return (
     <div className="anim">
       <div className="ph"><div className="sub">Dziennik</div><div className="title">DIETA</div></div>
@@ -2292,7 +2336,7 @@ function ScreenDiet({saveDay,aiActive,geminiKey,setGeminiKey,aiEnabled,setAiEnab
                     </div>
                     <div style={{display:"flex",gap:6,alignItems:"center"}}>
                       <button onClick={()=>setEditProduct({...p})} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:16,padding:"0 4px"}}>✏️</button>
-                      <button onClick={()=>{if(window.confirm(`Usunąć "${p.name}"?`)) setProductDB(db=>db.filter(x=>x.id!==p.id));}} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:16,padding:"0 4px"}}>🗑️</button>
+                      <button onClick={()=>setProductDB(db=>db.filter(x=>x.id!==p.id))} style={{background:"none",border:"none",color:"#ef444499",cursor:"pointer",fontSize:16,padding:"0 4px"}}>🗑️</button>
                     </div>
                   </div>
                   {/* Makro */}
@@ -2556,18 +2600,49 @@ function ScreenCalendar({history,exerciseDB={},dayLogs,workoutDates,weeklyGoals,
   );
 }
 // ── SCREEN: STATYSTYKI ────────────────────────────────────────────────────────
-function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
+function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[],settings={}}) {
   const [activeTab,   setActiveTab]   = useState("muscle_last");
   const [selGroup,    setSelGroup]    = useState("pull");
   const [selExercise, setSelExercise] = useState("Wyciąg góra szeroko");
   const [bodyWeight,  setBodyWeight]  = useState(()=>storage.get("bodyWeight",[]));
   const [newWeight,   setNewWeight]   = useState("");
   const [measurements,setMeasurements]= useState(()=>storage.get("measurements",{}));
+  const [measHistory, setMeasHistory] = useState(()=>storage.get("measHistory",[]));
   const [editMeas,    setEditMeas]    = useState(null);
   const [tmpMeas,     setTmpMeas]     = useState({});
+  const [bodyTab,     setBodyTab]     = useState("weight"); // weight | measures | history
+  const [selMeasKey,  setSelMeasKey]  = useState("klatka");
+  const [fatMethod,   setFatMethod]   = useState("ymca"); // ymca | navy
+  const [newFat,      setNewFat]      = useState(""); // ręczne wpisanie % tłuszczu
 
   useEffect(()=>{ storage.set("bodyWeight",bodyWeight); },[bodyWeight]);
   useEffect(()=>{ storage.set("measurements",measurements); },[measurements]);
+  useEffect(()=>{ storage.set("measHistory",measHistory); },[measHistory]);
+
+  // BMI calculation
+  const appCfg = storage.get("appSettings",{});
+  const heightCm = appCfg.height||188;
+
+  const lastW = [...bodyWeight].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+  const currentW = lastW?.val||0;
+  const bmi = currentW&&heightCm ? +(currentW/((heightCm/100)**2)).toFixed(1) : null;
+  const bmiLabel = !bmi?"–":bmi<18.5?"Niedowaga":bmi<25?"Norma":bmi<30?"Nadwaga":"Otyłość";
+  const bmiColor = !bmi?"var(--muted)":bmi<18.5?"#3b82f6":bmi<25?"#22c55e":bmi<30?"#eab308":"#ef4444";
+
+  // Body fat % - YMCA formula (waist - neck measurements)
+  const pas = measurements.pas||0;
+  const klatka = measurements.klatka||0;
+  const age = appCfg.age||38;
+  // Simple estimate: Navy formula approximation for men
+  // Fat% = 495/(1.0324 - 0.19077*log10(waist-neck) + 0.15456*log10(height)) - 450
+  // We'll use a simpler formula if we have waist only
+  const fatEstimate = bmi&&age ? +(1.2*bmi + 0.23*age - 5.4 - 10.8).toFixed(1) : null;
+
+  // Save measurements snapshot
+  const saveMeasSnapshot = () => {
+    const snap = {...measurements, date:today(), id:Date.now()};
+    setMeasHistory(p=>[...p.filter(s=>s.date!==today()), snap]);
+  };
 
   const totals={push:0,pull:0,fbw:0};
   Object.keys(totals).forEach(tp=>{ totals[tp]=[...new Set(history.filter(e=>e.type===tp).map(e=>e.date))].length; });
@@ -2746,6 +2821,134 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
       )}
 
       {activeTab==="body"&&<>
+        {/* Sub-tabs */}
+        <div style={{display:"flex",gap:6,margin:"0 16px 12px"}}>
+          {[["weight","⚖️ Waga"],["measures","📏 Obwody"],["history","📊 Historia"]].map(([id,l])=>(
+            <button key={id} onClick={()=>setBodyTab(id)} style={{flex:1,padding:"8px 4px",borderRadius:10,border:`1.5px solid ${bodyTab===id?"#3b82f6":"var(--border)"}`,background:bodyTab===id?"#3b82f622":"var(--card2)",color:bodyTab===id?"#3b82f6":"var(--muted)",fontWeight:700,fontSize:11,cursor:"pointer"}}>{l}</button>
+          ))}
+        </div>
+
+        {/* BMI + Fat strip - always visible */}
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,margin:"0 16px 12px"}}>
+          {[
+            ["⚖️ Waga", currentW?`${currentW} kg`:"–", "#3b82f6"],
+            ["📊 BMI", bmi?`${bmi}`:"–", bmiColor],
+            ["🏷️ Kategoria", bmiLabel, bmiColor],
+          ].map(([l,v,c])=>(
+            <div key={l} style={{background:"var(--card)",borderRadius:10,padding:"8px 6px",textAlign:"center"}}>
+              <div style={{fontFamily:"'Bebas Neue'",fontSize:18,color:c}}>{v}</div>
+              <div style={{fontSize:9,color:"var(--muted)",marginTop:2}}>{l}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* TAB: WAGA */}
+        {bodyTab==="weight"&&<>
+        <div className="card">
+          <div className="ctitle">Waga ciała</div>
+          <div className="row" style={{marginBottom:10}}>
+            <span style={{fontSize:13,color:"var(--muted2)",width:80}}>⚖️ Dzisiaj</span>
+            <input className="inp inp-r" type="number" step="0.1" placeholder="78.5" value={newWeight} onChange={e=>setNewWeight(e.target.value)}/>
+            <span style={{fontSize:13,color:"var(--muted)"}}>kg</span>
+          </div>
+          <button className="btn btn-red" onClick={()=>{ const v=parseFloat(newWeight); if(!v)return; setBodyWeight(p=>[...p.filter(w=>w.date!==today()),{date:today(),val:v,id:Date.now()}]); setNewWeight(""); }}>Zapisz wagę</button>
+          <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid var(--border)",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+            {[{l:"📏 Wzrost",k:"height",unit:"cm",placeholder:"188",step:1},{l:"🎂 Wiek",k:"age",unit:"lat",placeholder:"38",step:1}].map(({l,k,unit,placeholder,step})=>{
+              const val = storage.get("appSettings",{})[k]||"";
+              return (
+                <div key={k} style={{background:"var(--card2)",borderRadius:10,padding:"10px 12px"}}>
+                  <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>{l}</div>
+                  <div style={{display:"flex",alignItems:"center",gap:4}}>
+                    <input type="number" step={step} placeholder={placeholder}
+                      defaultValue={val}
+                      onChange={e=>{ const v=parseInt(e.target.value); if(v>0) storage.set("appSettings",{...storage.get("appSettings",{}),height:k==="height"?v:storage.get("appSettings",{}).height,age:k==="age"?v:storage.get("appSettings",{}).age}); }}
+                      style={{width:"100%",background:"transparent",border:"none",outline:"none",color:"var(--text)",fontFamily:"'Bebas Neue'",fontSize:22}}/>
+                    <span style={{fontSize:11,color:"var(--muted)"}}>{unit}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* % tkanki tłuszczowej */}
+          <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid var(--border)"}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div style={{fontSize:13,fontWeight:700}}>🧈 Tkanka tłuszczowa</div>
+              {fatEstimate&&<div style={{fontSize:11,color:"var(--muted)"}}>szacunek z BMI: ~{fatEstimate}%</div>}
+            </div>
+            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}>
+              <input className="inp inp-r" type="number" step="0.1" placeholder="np. 22.5" value={newFat} onChange={e=>setNewFat(e.target.value)}
+                style={{flex:1}}/>
+              <span style={{fontSize:13,color:"var(--muted)"}}>%</span>
+              <button onClick={()=>{
+                const v=parseFloat(newFat); if(!v)return;
+                setBodyWeight(p=>{
+                  const existing=p.find(w=>w.date===today());
+                  if(existing) return p.map(w=>w.date===today()?{...w,fat:v}:w);
+                  return [...p,{date:today(),val:currentW||0,fat:v,id:Date.now()}];
+                });
+                setNewFat("");
+              }} style={{background:"#3b82f6",border:"none",borderRadius:8,padding:"8px 14px",color:"#fff",fontWeight:700,cursor:"pointer",fontSize:12}}>Zapisz</button>
+            </div>
+            {/* Fat % history mini chart */}
+            {(()=>{
+              const fatData=[...bodyWeight].filter(w=>w.fat).sort((a,b)=>new Date(a.date)-new Date(b.date));
+              if(fatData.length<2) return <div style={{fontSize:11,color:"var(--muted)"}}>Wpisz % tłuszczu aby zobaczyć historię</div>;
+              const maxF=Math.max(...fatData.map(w=>w.fat));
+              const minF=Math.min(...fatData.map(w=>w.fat));
+              const rng=maxF-minF||1;
+              const h=60;
+              const pts=fatData.length-1||1;
+              return (
+                <div>
+                  <svg width="100%" height={h+20} viewBox={`0 0 100 ${h+20}`} preserveAspectRatio="none" style={{overflow:"visible"}}>
+                    <polyline points={fatData.map((w,i)=>`${(i/pts)*100},${h-((w.fat-minF)/rng)*h}`).join(" ")} fill="none" stroke="#eab308" strokeWidth="1.5"/>
+                    {fatData.map((w,i)=><circle key={i} cx={(i/pts)*100} cy={h-((w.fat-minF)/rng)*h} r="2" fill="#eab308"/>)}
+                    <text x="0" y={h+14} fontSize="6" fill="var(--muted)">{fmt(fatData[0].date)}</text>
+                    <text x="50" y={h+14} fontSize="6" fill="var(--muted)" textAnchor="middle">{minF}–{maxF}%</text>
+                    <text x="100" y={h+14} fontSize="6" fill="var(--muted)" textAnchor="end">{fmt(fatData[fatData.length-1].date)}</text>
+                  </svg>
+                  <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+                    {[...fatData].reverse().slice(0,5).map((w,i,arr)=>{
+                      const prev=arr[i+1]; const diff=prev?+(w.fat-prev.fat).toFixed(1):0;
+                      return <div key={w.id||i} style={{display:"flex",gap:6,alignItems:"center",fontSize:12,padding:"4px 0",borderBottom:"1px solid var(--border)",width:"100%"}}>
+                        <span style={{color:"var(--muted)",flex:1}}>{fmt(w.date)}</span>
+                        {diff!==0&&<span style={{fontSize:10,color:diff<0?"#22c55e":"#ef4444"}}>{diff<0?"▼":"▲"}{Math.abs(diff)}%</span>}
+                        <span style={{fontFamily:"'Bebas Neue'",fontSize:16,color:"#eab308"}}>{w.fat}%</span>
+                      </div>;
+                    })}
+                  </div>
+                </div>
+              );
+            })()}
+          </div>
+
+          {wSorted.length>1&&(
+            <svg width="100%" height={chartH+24} viewBox={`0 0 100 ${chartH+24}`} preserveAspectRatio="none" style={{overflow:"visible",marginTop:12}}>
+              <defs><linearGradient id="bwg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity=".3"/><stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/></linearGradient></defs>
+              <path d={[`M 0 ${chartH-((wSorted[0].val-minBW)/bwR)*chartH}`,...wSorted.slice(1).map((_,i)=>`L ${((i+1)/bwPts)*100} ${chartH-((wSorted[i+1].val-minBW)/bwR)*chartH}`),`L 100 ${chartH}`,`L 0 ${chartH}`,"Z"].join(" ")} fill="url(#bwg)"/>
+              <polyline points={wSorted.map((w,i)=>`${(i/bwPts)*100},${chartH-((w.val-minBW)/bwR)*chartH}`).join(" ")} fill="none" stroke="#3b82f6" strokeWidth="1.5"/>
+              {wSorted.map((w,i)=><circle key={i} cx={(i/bwPts)*100} cy={chartH-((w.val-minBW)/bwR)*chartH} r="2" fill="#3b82f6"/>)}
+              <text x="0" y={chartH+18} fontSize="7" fill="var(--muted)">{fmt(wSorted[0].date)}</text>
+              <text x="50" y={chartH+18} fontSize="7" fill="var(--muted)" textAnchor="middle">{minBW}–{maxBW}kg</text>
+              <text x="100" y={chartH+18} fontSize="7" fill="var(--muted)" textAnchor="end">{fmt(wSorted[wSorted.length-1].date)}</text>
+            </svg>
+          )}
+          {[...wSorted].reverse().slice(0,8).map((w,i,arr)=>{ const prev=arr[i+1]; const diff=prev?+(w.val-prev.val).toFixed(1):0; return (
+            <div key={w.id} className="ex-row">
+              <span className="ex-name">{fmt(w.date)}</span>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                {diff!==0&&<span style={{fontSize:11,color:diff<0?"#22c55e":"#ef4444"}}>{diff>0?"▲":"▼"}{Math.abs(diff)}</span>}
+                {w.fat&&<span style={{fontSize:11,color:"#eab308"}}>🧈{w.fat}%</span>}
+                <span className="ex-wt" style={{color:"#3b82f6"}}>{w.val} <span style={{fontSize:12}}>kg</span></span>
+              </div>
+            </div>
+          );})}
+        </div>
+        </>}
+
+        {/* TAB: OBWODY */}
+        {bodyTab==="measures"&&<>
         <div className="card">
           <div className="ctitle">Sylwetka – obwody (cm)</div>
           <div style={{position:"relative",width:"100%",paddingBottom:"110%"}}>
@@ -2774,53 +2977,73 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
               </div>
             );})}
           </div>
+          <button className="btn btn-red" style={{marginTop:12}} onClick={saveMeasSnapshot}>
+            📸 Zapisz snapshot pomiarów
+          </button>
         </div>
+        </>}
+
+        {/* TAB: HISTORIA POMIARÓW */}
+        {bodyTab==="history"&&<>
         <div className="card">
-          <div className="ctitle">Waga ciała</div>
-          <div className="row" style={{marginBottom:10}}>
-            <span style={{fontSize:13,color:"var(--muted2)",width:80}}>⚖️ Dzisiaj</span>
-            <input className="inp inp-r" type="number" step="0.1" placeholder="78.5" value={newWeight} onChange={e=>setNewWeight(e.target.value)}/>
-            <span style={{fontSize:13,color:"var(--muted)"}}>kg</span>
+          <div className="ctitle">Historia obwodów</div>
+          {/* Wybór partii do wykresu */}
+          <div style={{display:"flex",gap:4,flexWrap:"wrap",marginBottom:12}}>
+            {BODY_PARTS.map(bp=>(
+              <button key={bp.key} onClick={()=>setSelMeasKey(bp.key)}
+                style={{padding:"4px 8px",borderRadius:8,border:`1px solid ${selMeasKey===bp.key?"#ef4444":"var(--border)"}`,background:selMeasKey===bp.key?"#ef444422":"var(--card2)",color:selMeasKey===bp.key?"#ef4444":"var(--muted)",fontSize:11,cursor:"pointer"}}>
+                {bp.label}
+              </button>
+            ))}
           </div>
-          <button className="btn btn-red" onClick={()=>{ const v=parseFloat(newWeight); if(!v)return; setBodyWeight(p=>[...p.filter(w=>w.date!==today()),{date:today(),val:v,id:Date.now()}]); setNewWeight(""); }}>Zapisz wagę</button>
-          <div style={{marginTop:12,paddingTop:12,borderTop:"1px solid var(--border)",display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
-            {[{l:"📏 Wzrost",k:"height",unit:"cm",placeholder:"188",step:1},{l:"🎂 Wiek",k:"age",unit:"lat",placeholder:"38",step:1}].map(({l,k,unit,placeholder,step})=>{
-              const val = storage.get("appSettings",{})[k]||"";
-              return (
-                <div key={k} style={{background:"var(--card2)",borderRadius:10,padding:"10px 12px"}}>
-                  <div style={{fontSize:11,color:"var(--muted)",marginBottom:4}}>{l}</div>
-                  <div style={{display:"flex",alignItems:"center",gap:4}}>
-                    <input type="number" step={step} placeholder={placeholder}
-                      defaultValue={val}
-                      onChange={e=>{ const v=parseInt(e.target.value); if(v>0) storage.set("appSettings",{...storage.get("appSettings",{}),height:k==="height"?v:storage.get("appSettings",{}).height,age:k==="age"?v:storage.get("appSettings",{}).age}); }}
-                      style={{width:"100%",background:"transparent",border:"none",outline:"none",color:"var(--text)",fontFamily:"'Bebas Neue'",fontSize:22}}/>
-                    <span style={{fontSize:11,color:"var(--muted)"}}>{unit}</span>
-                  </div>
+          {(()=>{
+            const data=[...measHistory].filter(s=>s[selMeasKey]).sort((a,b)=>new Date(a.date)-new Date(b.date));
+            if(data.length<1) return <div style={{fontSize:12,color:"var(--muted)",textAlign:"center",padding:16}}>Brak danych – kliknij "Zapisz snapshot" w zakładce Obwody</div>;
+            const vals=data.map(s=>s[selMeasKey]);
+            const maxV=Math.max(...vals); const minV=Math.min(...vals); const rng=maxV-minV||1;
+            const h=80; const pts=data.length-1||1;
+            const bp=BODY_PARTS.find(b=>b.key===selMeasKey);
+            return (
+              <div>
+                <div style={{display:"flex",justifyContent:"space-between",marginBottom:8}}>
+                  <span style={{fontSize:12,color:"var(--muted2)",fontWeight:700}}>{bp?.label}</span>
+                  <span style={{fontSize:12}}>
+                    <span style={{color:vals[vals.length-1]<vals[0]?"#22c55e":"#ef4444",fontWeight:700}}>{vals[vals.length-1]} cm</span>
+                    {vals.length>1&&<span style={{color:"var(--muted)",fontSize:11}}> ({vals[vals.length-1]>vals[0]?"+":""}{(vals[vals.length-1]-vals[0]).toFixed(1)} cm)</span>}
+                  </span>
                 </div>
-              );
-            })}
-          </div>
-          {wSorted.length>1&&(
-            <svg width="100%" height={chartH+24} viewBox={`0 0 100 ${chartH+24}`} preserveAspectRatio="none" style={{overflow:"visible",marginTop:12}}>
-              <defs><linearGradient id="bwg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity=".3"/><stop offset="100%" stopColor="#3b82f6" stopOpacity="0"/></linearGradient></defs>
-              <path d={[`M 0 ${chartH-((wSorted[0].val-minBW)/bwR)*chartH}`,...wSorted.slice(1).map((_,i)=>`L ${((i+1)/bwPts)*100} ${chartH-((wSorted[i+1].val-minBW)/bwR)*chartH}`),`L 100 ${chartH}`,`L 0 ${chartH}`,"Z"].join(" ")} fill="url(#bwg)"/>
-              <polyline points={wSorted.map((w,i)=>`${(i/bwPts)*100},${chartH-((w.val-minBW)/bwR)*chartH}`).join(" ")} fill="none" stroke="#3b82f6" strokeWidth="1.5"/>
-              {wSorted.map((w,i)=><circle key={i} cx={(i/bwPts)*100} cy={chartH-((w.val-minBW)/bwR)*chartH} r="2" fill="#3b82f6"/>)}
-              <text x="0" y={chartH+18} fontSize="7" fill="var(--muted)">{fmt(wSorted[0].date)}</text>
-              <text x="50" y={chartH+18} fontSize="7" fill="var(--muted)" textAnchor="middle">{minBW}–{maxBW}kg</text>
-              <text x="100" y={chartH+18} fontSize="7" fill="var(--muted)" textAnchor="end">{fmt(wSorted[wSorted.length-1].date)}</text>
-            </svg>
-          )}
-          {[...wSorted].reverse().slice(0,8).map((w,i,arr)=>{ const prev=arr[i+1]; const diff=prev?+(w.val-prev.val).toFixed(1):0; return (
-            <div key={w.id} className="ex-row">
-              <span className="ex-name">{fmt(w.date)}</span>
-              <div style={{display:"flex",alignItems:"center",gap:8}}>
-                {diff!==0&&<span style={{fontSize:11,color:diff<0?"#22c55e":"#ef4444"}}>{diff>0?"▲":"▼"}{Math.abs(diff)}</span>}
-                <span className="ex-wt" style={{color:"#3b82f6"}}>{w.val} <span style={{fontSize:12}}>kg</span></span>
+                <svg width="100%" height={h+20} viewBox={`0 0 100 ${h+20}`} preserveAspectRatio="none" style={{overflow:"visible"}}>
+                  <defs><linearGradient id="mg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#ef4444" stopOpacity=".2"/><stop offset="100%" stopColor="#ef4444" stopOpacity="0"/></linearGradient></defs>
+                  <path d={[`M 0 ${h-((vals[0]-minV)/rng)*h}`,...data.slice(1).map((_,i)=>`L ${((i+1)/pts)*100} ${h-((vals[i+1]-minV)/rng)*h}`),`L 100 ${h}`,`L 0 ${h}`,"Z"].join(" ")} fill="url(#mg)"/>
+                  <polyline points={data.map((s,i)=>`${(i/pts)*100},${h-((s[selMeasKey]-minV)/rng)*h}`).join(" ")} fill="none" stroke="#ef4444" strokeWidth="1.5"/>
+                  {data.map((s,i)=><circle key={i} cx={(i/pts)*100} cy={h-((s[selMeasKey]-minV)/rng)*h} r="2.5" fill="#ef4444"/>)}
+                  <text x="0" y={h+14} fontSize="6" fill="var(--muted)">{fmt(data[0].date)}</text>
+                  <text x="50" y={h+14} fontSize="6" fill="var(--muted)" textAnchor="middle">{minV}–{maxV} cm</text>
+                  <text x="100" y={h+14} fontSize="6" fill="var(--muted)" textAnchor="end">{fmt(data[data.length-1].date)}</text>
+                </svg>
+                {/* Lista snapshots */}
+                <div style={{marginTop:8}}>
+                  {[...data].reverse().map((s,i,arr)=>{
+                    const prev=arr[i+1]; const diff=prev?+(s[selMeasKey]-prev[selMeasKey]).toFixed(1):0;
+                    return (
+                      <div key={s.id||s.date} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0",borderBottom:"1px solid var(--border)"}}>
+                        <span style={{fontSize:12,color:"var(--muted)"}}>{fmt(s.date)}</span>
+                        <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                          {diff!==0&&<span style={{fontSize:10,color:diff<0?"#22c55e":"#ef4444"}}>{diff<0?"▼":"▲"}{Math.abs(diff)}cm</span>}
+                          <span style={{fontFamily:"'Bebas Neue'",fontSize:18,color:"#ef4444"}}>{s[selMeasKey]} cm</span>
+                          <button onClick={()=>setMeasHistory(p=>p.filter(x=>(x.id||x.date)!==(s.id||s.date)))} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:13}}>×</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          );})}
+            );
+          })()}
         </div>
+        </>}
+
+
         {editMeas&&(()=>{ const bp=BODY_PARTS.find(b=>b.key===editMeas); return (
           <div className="modal-bg" onClick={()=>setEditMeas(null)}>
             <div className="modal" onClick={e=>e.stopPropagation()}>
@@ -2889,7 +3112,7 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
 
       {/* ── ZAKŁADKA: KROKI ─────────────────────────────────────────── */}
       {activeTab==="steps"&&(()=>{
-        const STEP_GOAL = 10000; // bierzemy domyślnie, settings tu niedostępne
+        const STEP_GOAL = settings?.stepGoal||10000;
         const days30 = Array.from({length:30},(_,i)=>{
           const d=new Date(); d.setDate(d.getDate()-29+i);
           const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
@@ -2987,7 +3210,7 @@ function ScreenStats({history,exerciseDB={},dayLogs,customExercises=[]}) {
 
       {/* ── ZAKŁADKA: KALORIE AKTYWNE ───────────────────────────────── */}
       {activeTab==="kcal"&&(()=>{
-        const KCAL_GOAL = 1000;
+        const KCAL_GOAL = settings?.kcalGoal||1000;
         const days30 = Array.from({length:30},(_,i)=>{
           const d=new Date(); d.setDate(d.getDate()-29+i);
           const ds=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
