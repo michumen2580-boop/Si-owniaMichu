@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.8.1";
+const APP_VERSION = "4.8.3";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -345,9 +345,11 @@ export default function App() {
   useEffect(()=>{ storage.set("dayLogs",dayLogs); },[dayLogs]);
 
   const todayStr = today();
-  const saveDay  = useCallback((data)=>{
+  const saveDay  = useCallback((data, targetDate)=>{
     setDayLogs(p=>{
-      const prev = p[todayStr]||{};
+      // targetDate overrides todayStr – used for past training
+      const ds = targetDate || todayStr;
+      const prev = p[ds]||{};
       // Accumulate workoutTypes as array
       let workoutTypes = prev.workoutTypes ? [...prev.workoutTypes] : (prev.workoutType ? [prev.workoutType] : []);
       if(data.workoutType && !workoutTypes.includes(data.workoutType)) {
@@ -359,14 +361,14 @@ export default function App() {
         cardioSessions = [...cardioSessions, data._newCardio];
       }
       const {_newCardio, _editPastDay, ...rest} = data;
-      // Handle past day edit
+      // Handle past day edit (steps/calories)
       if(_editPastDay) {
-        const {ds, steps, calories} = _editPastDay;
-        return {...p, [ds]:{...(p[ds]||{}), steps, calories}};
+        const {ds: eds, steps, calories} = _editPastDay;
+        return {...p, [eds]:{...(p[eds]||{}), steps, calories}};
       }
-      return {...p,[todayStr]:{...prev,...rest, workoutTypes, workoutType: workoutTypes[workoutTypes.length-1], cardioSessions}};
+      return {...p,[ds]:{...prev,...rest, workoutTypes, workoutType: workoutTypes[workoutTypes.length-1], cardioSessions}};
     });
-  },[todayStr]);
+  },[todayStr]); // todayStr in deps so saveDay refreshes daily
 
   const todayLog = dayLogs[todayStr]||{};
   const workoutDates = {};
@@ -942,7 +944,7 @@ function ScreenToday({todayLog,saveDay,streak,last7,history,dayLogs,todayStr,onS
 }
 
 // ── SCREEN: TRENING ───────────────────────────────────────────────────────────
-function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,settings,customExercises,setCustomExercises,hiddenExercises,setHiddenExercises,workoutTemplates,setWorkoutTemplates}) {
+function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,settings,customExercises,setCustomExercises,hiddenExercises,setHiddenExercises,workoutTemplates,setWorkoutTemplates,dayLogs={}}) {
   const [phase, setPhase]   = useState("select"); // select|session|cardio|exercises
   const [selType,setSelType]= useState(null);
   const [showPast,setShowPast]= useState(false);
@@ -1005,7 +1007,7 @@ function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,setti
   };
 
   if(phase==="session") return <SessionView type={selType} history={history} exerciseDB={exerciseDB} setExerciseDB={setExerciseDB} todayStr={pastDate||todayStr} onBack={()=>{setPhase("select");setPastDate("");}} saveDay={saveDay} settings={settings} customExercises={customExercises} hiddenExercises={hiddenExercises} workoutTemplates={workoutTemplates}/>;
-  if(phase==="cardio")  return <CardioView onBack={()=>{setPhase("select");setPastDate("");}} saveDay={saveDay} todayStr={pastDate||todayStr} dayLogs={dayLogs}/>;
+  if(phase==="cardio")  return <CardioView onBack={()=>{setPhase("select");setPastDate("");}} saveDay={saveDay} todayStr={pastDate||todayStr}/>;
 
   return (
     <div className="anim">
@@ -1395,7 +1397,7 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
         return next;
       });
     }
-    saveDay({type:"training",workoutType:type,duration:elapsed,note});
+    saveDay({type:"training",workoutType:type,duration:elapsed,note}, todayStr);
     setFinished(true);
   };
 
@@ -1529,7 +1531,7 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
 }
 
 // ── CARDIO VIEW ───────────────────────────────────────────────────────────────
-function CardioView({onBack,saveDay,todayStr,dayLogs={}}) {
+function CardioView({onBack,saveDay,todayStr}) {
   const [type,setType]=useState(null);
   const [km,setKm]=useState("");
   const [level,setLevel]=useState("4"); // schody - poziom
@@ -1550,6 +1552,7 @@ function CardioView({onBack,saveDay,todayStr,dayLogs={}}) {
   };
 
   if(saved) return <div className="anim" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"80vh",gap:16}}><div style={{fontSize:64}}>✅</div><div style={{fontFamily:"'Bebas Neue'",fontSize:32}}>ZAPISANO!</div><button className="btn btn-red" style={{width:"auto",paddingLeft:32,paddingRight:32}} onClick={onBack}>Powrót</button></div>;
+  if(!todayStr) return null; // safety guard
   return (
     <div className="anim">
       <div style={{padding:"48px 20px 16px",display:"flex",alignItems:"center",gap:12}}>
@@ -1638,7 +1641,7 @@ function CardioView({onBack,saveDay,todayStr,dayLogs={}}) {
               km:parseFloat(km)||0,
               elapsed:finalElapsed,
               level:type==="stairs"?parseInt(level):undefined
-            }});
+            }}, todayStr);
             setSaved(true);
           }}>✓ Zapisz</button>
         </div>
