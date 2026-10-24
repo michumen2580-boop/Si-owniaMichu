@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.8.3";
+const APP_VERSION = "4.8.4";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1006,6 +1006,7 @@ function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,setti
     setEditEx(null);
   };
 
+  if(phase==="gimnastyka") return <GimnastykaView onBack={()=>{setPhase("select");setPastDate("");}} saveDay={saveDay} todayStr={pastDate||todayStr} settings={settings}/>;
   if(phase==="session") return <SessionView type={selType} history={history} exerciseDB={exerciseDB} setExerciseDB={setExerciseDB} todayStr={pastDate||todayStr} onBack={()=>{setPhase("select");setPastDate("");}} saveDay={saveDay} settings={settings} customExercises={customExercises} hiddenExercises={hiddenExercises} workoutTemplates={workoutTemplates}/>;
   if(phase==="cardio")  return <CardioView onBack={()=>{setPhase("select");setPastDate("");}} saveDay={saveDay} todayStr={pastDate||todayStr}/>;
 
@@ -1030,9 +1031,9 @@ function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,setti
         </div>
         <div className="slabel">Typ treningu</div>
         <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:10,margin:"0 16px 12px"}}>
-          {[{id:"push",e:"🔴",n:"PUSH",d:"Klata·Barki·Triceps"},{id:"pull",e:"🔵",n:"PULL",d:"Plecy·Biceps"},{id:"fbw",e:"🟢",n:"FBW",d:"Full Body"},{id:"cardio",e:"🟡",n:"CARDIO",d:"Spacer·Bieżnia"}].map(t=>(
+          {[{id:"push",e:"🔴",n:"PUSH",d:"Klata·Barki·Triceps"},{id:"pull",e:"🔵",n:"PULL",d:"Plecy·Biceps"},{id:"fbw",e:"🟢",n:"FBW",d:"Full Body"},{id:"cardio",e:"🟡",n:"CARDIO",d:"Spacer·Bieżnia"},{id:"gimnastyka",e:"🤸",n:"GIMNASTYKA",d:"Obwód·Bez sprzętu"}].map(t=>(
             <div key={t.id} style={{background:"var(--card)",border:"1.5px solid var(--border)",borderRadius:16,padding:"20px 16px",cursor:"pointer",display:"flex",flexDirection:"column",gap:6}}
-              onClick={()=>{setSelType(t.id);setPhase(t.id==="cardio"?"cardio":"session");}}>
+              onClick={()=>{setSelType(t.id);setPhase(t.id==="cardio"?"cardio":t.id==="gimnastyka"?"gimnastyka":"session");}}>
               <span style={{fontSize:28}}>{t.e}</span>
               <span style={{fontFamily:"'Bebas Neue'",fontSize:22,letterSpacing:1.5,color:TYPE_COLOR[t.id]||"#eab308"}}>{t.n}</span>
               <span style={{fontSize:11,color:"var(--muted)"}}>{t.d}</span>
@@ -1270,7 +1271,7 @@ function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,setti
             <div style={{marginBottom:16}}>
               <div style={{fontSize:11,color:"var(--muted)",marginBottom:8}}>Typ treningu</div>
               <div style={{display:"flex",flexWrap:"wrap",gap:8}}>
-                {[{id:"push",l:"PUSH 🔴"},{id:"pull",l:"PULL 🔵"},{id:"fbw",l:"FBW 🟢"},{id:"cardio",l:"CARDIO 🟡"}].map(t=>(
+                {[{id:"push",l:"PUSH 🔴"},{id:"pull",l:"PULL 🔵"},{id:"fbw",l:"FBW 🟢"},{id:"cardio",l:"CARDIO 🟡"},{id:"gimnastyka",l:"GIMNASTYKA 🤸"}].map(t=>(
                   <button key={t.id} onClick={()=>setPastType(t.id)}
                     style={{flex:1,minWidth:"40%",padding:"10px 8px",borderRadius:10,border:`1.5px solid ${pastType===t.id?"#ef4444":"var(--border)"}`,background:pastType===t.id?"#ef444422":"var(--card2)",color:pastType===t.id?"#ef4444":"var(--muted)",fontWeight:700,cursor:"pointer",fontSize:13}}>
                     {t.l}
@@ -1282,7 +1283,7 @@ function ScreenTraining({history,exerciseDB,setExerciseDB,saveDay,todayStr,setti
               if(!pastDate) return;
               setShowPast(false);
               setSelType(pastType);
-              setPhase(pastType==="cardio"?"cardio":"session");
+              setPhase(pastType==="cardio"?"cardio":pastType==="gimnastyka"?"gimnastyka":"session");
             }} style={{width:"100%",opacity:pastDate?1:0.5}}>
               ▶ Rozpocznij sesję dla {pastDate?pastDate.split("-").reverse().join("."):"..."}
             </button>
@@ -1531,6 +1532,356 @@ function SessionView({type,history,exerciseDB={},setExerciseDB,todayStr,onBack,s
 }
 
 // ── CARDIO VIEW ───────────────────────────────────────────────────────────────
+
+// ── GIMNASTYKA VIEW ───────────────────────────────────────────────────────────
+const WARMUP_JOINTS = [
+  {id:"kostki",name:"Kostki i stopy",duration:10},
+  {id:"kolana_kr",name:"Krążenia kolan",duration:10},
+  {id:"kolana_wym",name:"Wymachy kolan",duration:10},
+  {id:"biodro_kr",name:"Krążenia nóg – staw biodrowy",duration:10},
+  {id:"biodra",name:"Krążenia bioder",duration:10},
+  {id:"skret",name:"Skręty w bok",duration:10},
+  {id:"sklony",name:"Skłony",duration:10},
+  {id:"rece",name:"Wymachy rąk w bok",duration:10},
+  {id:"lokcie",name:"Łokcie",duration:10},
+  {id:"szyja",name:"Szyja",duration:10},
+];
+const WARMUP_MUSCLES = [
+  {id:"wspięcia_w",name:"Wspięcia łydek",reps:20},
+  {id:"przysiady_w",name:"Przysiady",reps:10},
+  {id:"lokcie_kolana",name:"Łokcie do kolan",reps:10},
+  {id:"pajacyki_w",name:"Pajacyki",reps:20},
+];
+const DEFAULT_CIRCUIT = [
+  {id:"wspięcia",name:"Wspięcia łydek",reps:10},
+  {id:"pajacyki",name:"Pajacyki",reps:10},
+  {id:"przysiad",name:"Przysiad normalny",reps:10},
+  {id:"pompki_tyl",name:"Pompki tyłem – triceps",reps:10},
+  {id:"pompki",name:"Pompki klasyczne",reps:10},
+  {id:"odwodzenie",name:"Odwodzenie nóg",reps:10},
+  {id:"lodka",name:"Łódka",reps:10},
+  {id:"brzuszki",name:"Brzuszki",reps:10},
+  {id:"wznosy_nog",name:"Wznosy nóg leżąc",reps:10},
+  {id:"biceps",name:"Uginanie na biceps",reps:10},
+  {id:"wznosy_bok",name:"Wznosy bokiem",reps:10},
+  {id:"wznosy_gora",name:"Wznosy nad głowę",reps:10},
+  {id:"wiosłowanie",name:"Wiosłowanie",reps:10},
+  {id:"martwy",name:"Martwy ciąg",reps:10},
+  {id:"plank",name:"Plank",reps:30,isTime:true},
+];
+
+function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
+  const appCfg = storage.get("appSettings",{});
+  const weight = storage.get("bodyWeight",[]).sort((a,b)=>new Date(b.date)-new Date(a.date))[0]?.val||appCfg.weight||80;
+  const gymData = storage.get("gymData",{sessions:0,circuit:DEFAULT_CIRCUIT});
+  const sessions = gymData.sessions||0;
+  const progress = +(sessions*0.5).toFixed(1);
+
+  const circuit = (gymData.circuit||DEFAULT_CIRCUIT).map(ex=>({
+    ...ex, reps: Math.round((ex.reps + progress)*2)/2
+  }));
+
+  const [phase,setPhase] = useState("start"); // start|warmup_joints|warmup_muscles|rest|circuit|done
+  const [series,setSeries] = useState(2);
+  const [curSeries,setCurSeries] = useState(1);
+  const [step,setStep] = useState(0);
+  const [timer,setTimer] = useState(0);
+  const [paused,setPaused] = useState(false);
+  const [editMode,setEditMode] = useState(false);
+  const [localCircuit,setLocalCircuit] = useState(circuit);
+  const startTime = useState(Date.now())[0];
+
+  // Timer tick
+  useEffect(()=>{
+    if(phase!=="warmup_joints"&&phase!=="rest") return;
+    if(paused) return;
+    if(timer<=0){
+      handleNext();
+      return;
+    }
+    const t=setTimeout(()=>setTimer(s=>s-1),1000);
+    return()=>clearTimeout(t);
+  },[timer,phase,paused]);
+
+  // Voice + sound
+  const speak = (text) => {
+    if(!window.speechSynthesis) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang="pl-PL"; u.rate=0.95; u.pitch=1;
+    window.speechSynthesis.speak(u);
+  };
+  const beep = (times=1) => {
+    try{
+      const ctx=new (window.AudioContext||window.webkitAudioContext)();
+      for(let i=0;i<times;i++){
+        const o=ctx.createOscillator(); const g=ctx.createGain();
+        o.connect(g); g.connect(ctx.destination);
+        o.frequency.value=880; g.gain.value=0.3;
+        o.start(ctx.currentTime+i*0.3);
+        o.stop(ctx.currentTime+i*0.3+0.15);
+      }
+    }catch(e){}
+  };
+
+  // Announce when timer hits 3
+  useEffect(()=>{
+    if(timer===3) beep(1);
+    if(timer===2||timer===1) beep(1);
+    if(timer===0&&phase==="warmup_joints"){
+      const next=WARMUP_JOINTS[step+1];
+      if(next) speak(next.name);
+      else speak("Teraz ćwiczenia rozgrzewkowe");
+    }
+  },[timer]);
+
+  const announceCircuit = (ex) => {
+    if(!ex) return;
+    const txt = ex.isTime
+      ? `${ex.name} – ${ex.reps} sekund`
+      : `${ex.name} – ${ex.reps} powtórzeń`;
+    speak(txt);
+    beep(2);
+  };
+
+  const handleNext = () => {
+    if(phase==="warmup_joints"){
+      const next=step+1;
+      if(next<WARMUP_JOINTS.length){
+        setStep(next);
+        setTimer(WARMUP_JOINTS[next].duration);
+      } else {
+        setPhase("warmup_muscles");
+        setStep(0);
+        speak(WARMUP_MUSCLES[0].name+" – "+WARMUP_MUSCLES[0].reps+" powtórzeń");
+        beep(2);
+      }
+    } else if(phase==="warmup_muscles"){
+      const next=step+1;
+      if(next<WARMUP_MUSCLES.length){
+        setStep(next);
+        speak(WARMUP_MUSCLES[next].name+" – "+WARMUP_MUSCLES[next].reps+" powtórzeń");
+        beep(2);
+      } else {
+        setPhase("rest");
+        setTimer(20);
+        speak("Przerwa dwadzieścia sekund. Zaraz zaczyna się obwód numer jeden");
+      }
+    } else if(phase==="rest"){
+      setPhase("circuit");
+      setStep(0);
+      announceCircuit(localCircuit[0]);
+    } else if(phase==="circuit"){
+      const next=step+1;
+      if(next<localCircuit.length){
+        setStep(next);
+        setPhase("rest");
+        setTimer(20);
+        const ex=localCircuit[next];
+        speak("Przerwa. Następnie "+ex.name+" – "+(ex.isTime?ex.reps+" sekund":ex.reps+" powtórzeń"));
+      } else {
+        if(curSeries<series){
+          const ns=curSeries+1;
+          setCurSeries(ns);
+          setStep(0);
+          setPhase("rest");
+          setTimer(30);
+          speak("Seria "+ns+" z "+series+". Przerwa trzydzieści sekund.");
+        } else {
+          // DONE
+          const elapsed=Math.floor((Date.now()-startTime)/1000);
+          const newSessions=sessions+1;
+          const newCircuit=DEFAULT_CIRCUIT; // base values stored, progress calculated on load
+          storage.set("gymData",{sessions:newSessions,circuit:newCircuit});
+          saveDay({workoutType:"gimnastyka",type:"training",duration:elapsed},todayStr);
+          speak("Trening zakończony. Brawo!");
+          beep(3);
+          setPhase("done");
+        }
+      }
+    }
+  };
+
+  const color="#a855f7";
+
+  // ── START SCREEN ──────────────────────────────────────────────────────────
+  if(phase==="start") return (
+    <div className="anim" style={{padding:"48px 20px 20px"}}>
+      <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:24}}>
+        <button onClick={onBack} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:10,width:36,height:36,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--text)"}}><Ic n="chL" s={18}/></button>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:28,letterSpacing:2,color}}>GIMNASTYKA</div>
+      </div>
+
+      {/* Stats */}
+      <div className="card" style={{marginBottom:12}}>
+        <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8}}>
+          {[
+            ["⚖️ Waga",weight+" kg"],
+            ["🎂 Wiek",(appCfg.age||38)+" lat"],
+            ["📏 Wzrost",(appCfg.height||188)+" cm"],
+            ["🏋️ Sesji łącznie",sessions+"x"],
+            ["📈 Bonus powtórzeń","+"+progress],
+            ["💪 Obwodów",series+"x"],
+          ].map(([l,v])=>(
+            <div key={l} style={{textAlign:"center",background:"var(--card2)",borderRadius:10,padding:"8px 4px"}}>
+              <div style={{fontFamily:"'Bebas Neue'",fontSize:18,color}}>{v}</div>
+              <div style={{fontSize:10,color:"var(--muted)"}}>{l}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Series selector */}
+      <div className="card" style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+        <span style={{fontSize:14,fontWeight:700}}>🔄 Liczba obwodów</span>
+        <div style={{display:"flex",alignItems:"center",gap:12}}>
+          <button onClick={()=>setSeries(s=>Math.max(1,s-1))} style={{width:34,height:34,borderRadius:10,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:20,cursor:"pointer"}}>−</button>
+          <span style={{fontFamily:"'Bebas Neue'",fontSize:24,minWidth:24,textAlign:"center",color}}>{series}</span>
+          <button onClick={()=>setSeries(s=>Math.min(5,s+1))} style={{width:34,height:34,borderRadius:10,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:20,cursor:"pointer"}}>+</button>
+        </div>
+      </div>
+
+      {/* Circuit preview */}
+      <div className="card" style={{marginBottom:16}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div style={{fontSize:13,fontWeight:700,color:"var(--muted2)"}}>PLAN OBWODU ({localCircuit.length} ćwiczeń)</div>
+          <button onClick={()=>setEditMode(e=>!e)} style={{fontSize:11,padding:"4px 10px",borderRadius:8,border:`1px solid ${editMode?"#a855f7":"var(--border)"}`,background:editMode?"#a855f722":"var(--card2)",color:editMode?"#a855f7":"var(--muted)",cursor:"pointer"}}>✏️ Edytuj</button>
+        </div>
+        {localCircuit.map((ex,i)=>(
+          <div key={ex.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid var(--border)"}}>
+            <span style={{fontSize:12,color:"var(--muted2)"}}>{i+1}. {ex.name}</span>
+            {editMode?(
+              <div style={{display:"flex",gap:4,alignItems:"center"}}>
+                <button onClick={()=>{if(i>0){const a=[...localCircuit];[a[i-1],a[i]]=[a[i],a[i-1]];setLocalCircuit(a);}}} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:14}}>▲</button>
+                <button onClick={()=>{if(i<localCircuit.length-1){const a=[...localCircuit];[a[i],a[i+1]]=[a[i+1],a[i]];setLocalCircuit(a);}}} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:14}}>▼</button>
+                <button onClick={()=>setLocalCircuit(c=>c.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:14}}>×</button>
+              </div>
+            ):(
+              <span style={{fontFamily:"'Bebas Neue'",fontSize:14,color}}>{ex.reps}{ex.isTime?"s":"x"}</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      <button onClick={()=>{
+        setLocalCircuit(circuit);
+        setPhase("warmup_joints");
+        setStep(0);
+        setTimer(WARMUP_JOINTS[0].duration);
+        speak("Zaczynamy rozgrzewkę stawów. "+WARMUP_JOINTS[0].name);
+        beep(2);
+      }} style={{width:"100%",background:color,border:"none",borderRadius:14,padding:"16px",color:"#fff",fontFamily:"'Bebas Neue'",fontSize:22,cursor:"pointer",letterSpacing:2}}>
+        🤸 START
+      </button>
+    </div>
+  );
+
+  // ── DONE SCREEN ───────────────────────────────────────────────────────────
+  if(phase==="done") return (
+    <div className="anim" style={{display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",height:"80vh",gap:16,padding:24,textAlign:"center"}}>
+      <div style={{fontSize:72}}>🏆</div>
+      <div style={{fontFamily:"'Bebas Neue'",fontSize:36,color}}>TRENING UKOŃCZONY!</div>
+      <div style={{fontSize:14,color:"var(--muted)"}}>Sesja #{sessions+1} · +0.5 powtórzeń od następnego razu</div>
+      <div style={{background:"var(--card2)",borderRadius:12,padding:"12px 24px",fontSize:13,color:"var(--muted2)"}}>
+        Czas: {Math.floor((Date.now()-startTime)/60000)} min {Math.floor(((Date.now()-startTime)/1000)%60)} sek
+      </div>
+      <button onClick={onBack} className="btn btn-red" style={{width:"auto",padding:"12px 32px",marginTop:8}}>← Powrót</button>
+    </div>
+  );
+
+  // ── WORKOUT SCREENS ───────────────────────────────────────────────────────
+  const totalSteps = phase==="warmup_joints"?WARMUP_JOINTS.length:phase==="warmup_muscles"?WARMUP_MUSCLES.length:localCircuit.length;
+  const progPct = Math.round((step/totalSteps)*100);
+  const isJoint = phase==="warmup_joints";
+  const isMuscle = phase==="warmup_muscles";
+  const isCircuit = phase==="circuit";
+  const isRest = phase==="rest";
+  const curEx = isJoint?WARMUP_JOINTS[step]:isMuscle?WARMUP_MUSCLES[step]:localCircuit[step];
+
+  return (
+    <div className="anim" style={{minHeight:"100vh",display:"flex",flexDirection:"column"}}>
+      {/* Sticky header */}
+      <div style={{position:"sticky",top:0,zIndex:100,background:"var(--bg)",borderBottom:"1px solid var(--border)",padding:"8px 16px",display:"flex",alignItems:"center",gap:10}}>
+        <button onClick={()=>{window.speechSynthesis?.cancel();onBack();}} style={{background:"var(--card2)",border:"1px solid var(--border)",borderRadius:8,width:32,height:32,display:"flex",alignItems:"center",justifyContent:"center",cursor:"pointer",color:"var(--text)"}}><Ic n="chL" s={16}/></button>
+        <div style={{fontFamily:"'Bebas Neue'",fontSize:16,color,flexShrink:0}}>GIMNASTYKA</div>
+        <div style={{flex:1,background:"var(--border)",borderRadius:4,height:6}}>
+          <div style={{height:"100%",borderRadius:4,background:color,width:`${progPct}%`,transition:"width .3s"}}/>
+        </div>
+        {isCircuit&&<div style={{fontSize:11,color:"var(--muted)",flexShrink:0}}>S{curSeries}/{series}</div>}
+        <button onClick={()=>setPaused(p=>!p)} style={{background:paused?"#22c55e22":"var(--card2)",border:`1px solid ${paused?"#22c55e":"var(--border)"}`,borderRadius:8,padding:"4px 10px",color:paused?"#22c55e":"var(--muted)",fontSize:12,cursor:"pointer",flexShrink:0}}>
+          {paused?"▶":"⏸"}
+        </button>
+      </div>
+
+      <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:"24px 20px",textAlign:"center"}}>
+
+        {/* Phase label */}
+        <div style={{fontSize:12,fontWeight:700,letterSpacing:2,color:"var(--muted)",marginBottom:8}}>
+          {isJoint?"ROZGRZEWKA – STAWY":isMuscle?"ROZGRZEWKA – MIĘŚNIE":isRest?"PRZERWA":"OBWÓD "+curSeries+"/"+series}
+        </div>
+
+        {/* Step counter */}
+        <div style={{fontSize:11,color:"var(--muted)",marginBottom:16}}>
+          {isRest?"":`${step+1}/${totalSteps}`}
+        </div>
+
+        {/* REST SCREEN */}
+        {isRest&&(
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+            <div style={{width:120,height:120,borderRadius:"50%",border:`6px solid ${color}`,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+              <div style={{fontFamily:"'Bebas Neue'",fontSize:52,color}}>{timer}</div>
+            </div>
+            <div style={{fontSize:16,color:"var(--muted2)",fontWeight:700}}>Przerwa</div>
+            {localCircuit[step]&&(
+              <div style={{fontSize:13,color:"var(--muted)"}}>
+                Następne: <strong style={{color:"var(--text)"}}>{localCircuit[step].name}</strong>
+              </div>
+            )}
+            <button onClick={handleNext} style={{background:color,border:"none",borderRadius:12,padding:"12px 32px",color:"#fff",fontFamily:"'Bebas Neue'",fontSize:18,cursor:"pointer",marginTop:8}}>
+              POMIŃ PRZERWĘ →
+            </button>
+          </div>
+        )}
+
+        {/* JOINT WARMUP */}
+        {isJoint&&(
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
+            <div style={{width:140,height:140,borderRadius:"50%",border:`6px solid ${color}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
+              <div style={{fontFamily:"'Bebas Neue'",fontSize:56,color}}>{timer}</div>
+            </div>
+            <div style={{fontSize:22,fontWeight:700,color:"var(--text)",marginTop:8}}>{curEx.name}</div>
+            <div style={{fontSize:12,color:"var(--muted)"}}>10 sekund</div>
+            {step<WARMUP_JOINTS.length-1&&(
+              <div style={{fontSize:12,color:"var(--muted)"}}>Następne: {WARMUP_JOINTS[step+1].name}</div>
+            )}
+            <button onClick={handleNext} style={{background:"var(--card2)",border:`1px solid ${color}`,borderRadius:12,padding:"10px 28px",color,fontFamily:"'Bebas Neue'",fontSize:16,cursor:"pointer",marginTop:8}}>
+              DALEJ →
+            </button>
+          </div>
+        )}
+
+        {/* MUSCLE WARMUP + CIRCUIT */}
+        {(isMuscle||isCircuit)&&curEx&&(
+          <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16,width:"100%"}}>
+            <div style={{fontSize:26,fontWeight:700,color:"var(--text)",lineHeight:1.2}}>{curEx.name}</div>
+            <div style={{fontFamily:"'Bebas Neue'",fontSize:72,color,lineHeight:1}}>
+              {curEx.reps}<span style={{fontSize:24,color:"var(--muted)"}}>{curEx.isTime?"s":"x"}</span>
+            </div>
+            {isCircuit&&(
+              <div style={{fontSize:12,color:"var(--muted)"}}>
+                Seria {curSeries}/{series} · Ćwiczenie {step+1}/{localCircuit.length}
+              </div>
+            )}
+            <button onClick={handleNext} style={{background:color,border:"none",borderRadius:14,padding:"16px 48px",color:"#fff",fontFamily:"'Bebas Neue'",fontSize:24,cursor:"pointer",marginTop:8,width:"100%",maxWidth:280}}>
+              DALEJ →
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function CardioView({onBack,saveDay,todayStr}) {
   const [type,setType]=useState(null);
   const [km,setKm]=useState("");
