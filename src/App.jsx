@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.8.4";
+const APP_VERSION = "4.8.5";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1585,15 +1585,16 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
   const [series,setSeries] = useState(2);
   const [curSeries,setCurSeries] = useState(1);
   const [step,setStep] = useState(0);
+  const [nextStep,setNextStep] = useState(0); // step to go to AFTER rest
   const [timer,setTimer] = useState(0);
   const [paused,setPaused] = useState(false);
   const [editMode,setEditMode] = useState(false);
   const [localCircuit,setLocalCircuit] = useState(circuit);
   const startTime = useState(Date.now())[0];
 
-  // Timer tick
+  // Timer tick – joints, muscle warmup and rest
   useEffect(()=>{
-    if(phase!=="warmup_joints"&&phase!=="rest") return;
+    if(phase!=="warmup_joints"&&phase!=="warmup_muscles"&&phase!=="rest") return;
     if(paused) return;
     if(timer<=0){
       handleNext();
@@ -1651,48 +1652,58 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
         setStep(next);
         setTimer(WARMUP_JOINTS[next].duration);
       } else {
+        // Go to muscle warmup – auto timer = 2s per rep
         setPhase("warmup_muscles");
         setStep(0);
-        speak(WARMUP_MUSCLES[0].name+" – "+WARMUP_MUSCLES[0].reps+" powtórzeń");
+        const ex=WARMUP_MUSCLES[0];
+        const dur=ex.reps*2;
+        setTimer(dur);
+        speak(ex.name+" – "+ex.reps+" powtórzeń");
         beep(2);
       }
     } else if(phase==="warmup_muscles"){
       const next=step+1;
       if(next<WARMUP_MUSCLES.length){
         setStep(next);
-        speak(WARMUP_MUSCLES[next].name+" – "+WARMUP_MUSCLES[next].reps+" powtórzeń");
+        const ex=WARMUP_MUSCLES[next];
+        const dur=ex.reps*2;
+        setTimer(dur);
+        speak(ex.name+" – "+ex.reps+" powtórzeń");
         beep(2);
       } else {
+        // Muscle warmup done → rest before circuit
+        setNextStep(0);
         setPhase("rest");
         setTimer(20);
-        speak("Przerwa dwadzieścia sekund. Zaraz zaczyna się obwód numer jeden");
+        speak("Przerwa dwadzieścia sekund. Zaraz zaczyna się obwód numer jeden. "+localCircuit[0].name);
       }
     } else if(phase==="rest"){
+      // After rest → go to circuit at nextStep
+      const s=nextStep;
+      setStep(s);
       setPhase("circuit");
-      setStep(0);
-      announceCircuit(localCircuit[0]);
+      announceCircuit(localCircuit[s]);
     } else if(phase==="circuit"){
       const next=step+1;
       if(next<localCircuit.length){
-        setStep(next);
+        // Rest before next exercise
+        setNextStep(next);
         setPhase("rest");
         setTimer(20);
         const ex=localCircuit[next];
         speak("Przerwa. Następnie "+ex.name+" – "+(ex.isTime?ex.reps+" sekund":ex.reps+" powtórzeń"));
       } else {
+        // Series done
         if(curSeries<series){
           const ns=curSeries+1;
           setCurSeries(ns);
-          setStep(0);
+          setNextStep(0);
           setPhase("rest");
           setTimer(30);
-          speak("Seria "+ns+" z "+series+". Przerwa trzydzieści sekund.");
+          speak("Seria "+ns+" z "+series+". Przerwa trzydzieści sekund. "+localCircuit[0].name);
         } else {
-          // DONE
           const elapsed=Math.floor((Date.now()-startTime)/1000);
-          const newSessions=sessions+1;
-          const newCircuit=DEFAULT_CIRCUIT; // base values stored, progress calculated on load
-          storage.set("gymData",{sessions:newSessions,circuit:newCircuit});
+          storage.set("gymData",{sessions:sessions+1,circuit:DEFAULT_CIRCUIT});
           saveDay({workoutType:"gimnastyka",type:"training",duration:elapsed},todayStr);
           speak("Trening zakończony. Brawo!");
           beep(3);
@@ -1796,7 +1807,7 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
   const isMuscle = phase==="warmup_muscles";
   const isCircuit = phase==="circuit";
   const isRest = phase==="rest";
-  const curEx = isJoint?WARMUP_JOINTS[step]:isMuscle?WARMUP_MUSCLES[step]:localCircuit[step];
+  const curEx = isJoint?WARMUP_JOINTS[step]:isMuscle?WARMUP_MUSCLES[step]:isRest?localCircuit[nextStep]:localCircuit[step];
 
   return (
     <div className="anim" style={{minHeight:"100vh",display:"flex",flexDirection:"column"}}>
@@ -1828,13 +1839,15 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
         {/* REST SCREEN */}
         {isRest&&(
           <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:16}}>
-            <div style={{width:120,height:120,borderRadius:"50%",border:`6px solid ${color}`,display:"flex",alignItems:"center",justifyContent:"center",position:"relative"}}>
+            <div style={{width:120,height:120,borderRadius:"50%",border:`6px solid ${color}`,display:"flex",alignItems:"center",justifyContent:"center"}}>
               <div style={{fontFamily:"'Bebas Neue'",fontSize:52,color}}>{timer}</div>
             </div>
-            <div style={{fontSize:16,color:"var(--muted2)",fontWeight:700}}>Przerwa</div>
-            {localCircuit[step]&&(
-              <div style={{fontSize:13,color:"var(--muted)"}}>
-                Następne: <strong style={{color:"var(--text)"}}>{localCircuit[step].name}</strong>
+            <div style={{fontSize:16,color:"var(--muted2)",fontWeight:700}}>⏸ Przerwa</div>
+            {localCircuit[nextStep]&&(
+              <div style={{textAlign:"center"}}>
+                <div style={{fontSize:12,color:"var(--muted)",marginBottom:4}}>Następne ćwiczenie:</div>
+                <div style={{fontSize:17,fontWeight:700,color:"var(--text)"}}>{localCircuit[nextStep].name}</div>
+                <div style={{fontFamily:"'Bebas Neue'",fontSize:28,color,marginTop:4}}>{localCircuit[nextStep].reps}{localCircuit[nextStep].isTime?"s":"x"}</div>
               </div>
             )}
             <button onClick={handleNext} style={{background:color,border:"none",borderRadius:12,padding:"12px 32px",color:"#fff",fontFamily:"'Bebas Neue'",fontSize:18,cursor:"pointer",marginTop:8}}>
