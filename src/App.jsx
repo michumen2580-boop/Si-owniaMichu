@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 
-const APP_VERSION = "4.8.5";
+const APP_VERSION = "4.8.7";
 const DATA_VERSION = 11;
 
 // ── STORAGE ───────────────────────────────────────────────────────────────────
@@ -1578,7 +1578,7 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
   const progress = +(sessions*0.5).toFixed(1);
 
   const circuit = (gymData.circuit||DEFAULT_CIRCUIT).map(ex=>({
-    ...ex, reps: Math.round((ex.reps + progress)*2)/2
+    ...ex, reps: ex.isTime ? ex.reps : Math.round((ex.reps + progress)*2)/2
   }));
 
   const [phase,setPhase] = useState("start"); // start|warmup_joints|warmup_muscles|rest|circuit|done
@@ -1590,6 +1590,31 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
   const [paused,setPaused] = useState(false);
   const [editMode,setEditMode] = useState(false);
   const [localCircuit,setLocalCircuit] = useState(circuit);
+  const [showAddEx,setShowAddEx] = useState(false);
+  const [newEx,setNewEx] = useState({name:"",reps:"10",isTime:false});
+  const [restSec,setRestSec] = useState(gymData.restSec||20);
+  const [seriesRestSec,setSeriesRestSec] = useState(gymData.seriesRestSec||30);
+  const [jointSec,setJointSec] = useState(gymData.jointSec||15);
+
+  const saveGymExtra = (extra) => { const gd=storage.get("gymData",{sessions:0}); storage.set("gymData",{...gd,...extra}); };
+  const chgTime = (key,set,val) => { set(val); saveGymExtra({[key]:val}); };
+
+  // Zapis obwodu (baza bez bonusu) – kolejność i nowe ćwiczenia przetrwają restart
+  useEffect(()=>{
+    saveGymExtra({circuit:localCircuit.map(e=>({...e,reps:e.isTime?e.reps:+(e.reps-progress).toFixed(1)}))});
+  },[localCircuit]);
+
+  // Nie wygaszaj ekranu podczas treningu
+  const gymIdle = phase==="start"||phase==="done";
+  useEffect(()=>{
+    if(gymIdle) return;
+    let wl=null;
+    const acq=async()=>{ try{ if("wakeLock" in navigator) wl=await navigator.wakeLock.request("screen"); }catch(e){} };
+    acq();
+    const re=()=>{ if(document.visibilityState==="visible") acq(); };
+    document.addEventListener("visibilitychange",re);
+    return()=>{ document.removeEventListener("visibilitychange",re); if(wl){ try{wl.release();}catch(e){} } };
+  },[gymIdle]);
   const startTime = useState(Date.now())[0];
 
   // Timer tick – joints, muscle warmup and rest
@@ -1650,7 +1675,7 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
       const next=step+1;
       if(next<WARMUP_JOINTS.length){
         setStep(next);
-        setTimer(WARMUP_JOINTS[next].duration);
+        setTimer(jointSec);
       } else {
         // Go to muscle warmup – auto timer = 2s per rep
         setPhase("warmup_muscles");
@@ -1674,8 +1699,8 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
         // Muscle warmup done → rest before circuit
         setNextStep(0);
         setPhase("rest");
-        setTimer(20);
-        speak("Przerwa dwadzieścia sekund. Zaraz zaczyna się obwód numer jeden. "+localCircuit[0].name);
+        setTimer(restSec);
+        speak("Przerwa "+restSec+" sekund. Zaraz zaczyna się obwód numer jeden. "+localCircuit[0].name);
       }
     } else if(phase==="rest"){
       // After rest → go to circuit at nextStep
@@ -1689,7 +1714,7 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
         // Rest before next exercise
         setNextStep(next);
         setPhase("rest");
-        setTimer(20);
+        setTimer(restSec);
         const ex=localCircuit[next];
         speak("Przerwa. Następnie "+ex.name+" – "+(ex.isTime?ex.reps+" sekund":ex.reps+" powtórzeń"));
       } else {
@@ -1699,11 +1724,11 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
           setCurSeries(ns);
           setNextStep(0);
           setPhase("rest");
-          setTimer(30);
-          speak("Seria "+ns+" z "+series+". Przerwa trzydzieści sekund. "+localCircuit[0].name);
+          setTimer(seriesRestSec);
+          speak("Seria "+ns+" z "+series+". Przerwa "+seriesRestSec+" sekund. "+localCircuit[0].name);
         } else {
           const elapsed=Math.floor((Date.now()-startTime)/1000);
-          storage.set("gymData",{sessions:sessions+1,circuit:DEFAULT_CIRCUIT});
+          saveGymExtra({sessions:sessions+1});
           saveDay({workoutType:"gimnastyka",type:"training",duration:elapsed},todayStr);
           speak("Trening zakończony. Brawo!");
           beep(3);
@@ -1752,12 +1777,70 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
         </div>
       </div>
 
+      {/* Czasy */}
+      <div className="card" style={{marginBottom:12}}>
+        <div style={{fontSize:13,fontWeight:700,color:"var(--muted2)",marginBottom:6}}>⏱ CZASY</div>
+        {[
+          ["Przerwa między ćwiczeniami",restSec,setRestSec,"restSec",5,120],
+          ["Przerwa między obwodami",seriesRestSec,setSeriesRestSec,"seriesRestSec",5,180],
+          ["Czas na każdy staw",jointSec,setJointSec,"jointSec",5,60],
+        ].map(([l,v,set,key,min,max])=>(
+          <div key={key} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 0"}}>
+            <span style={{fontSize:12,color:"var(--muted2)"}}>{l}</span>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <button onClick={()=>chgTime(key,set,Math.max(min,v-5))} style={{width:30,height:30,borderRadius:8,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:18,cursor:"pointer"}}>−</button>
+              <span style={{fontFamily:"'Bebas Neue'",fontSize:20,minWidth:40,textAlign:"center",color}}>{v}s</span>
+              <button onClick={()=>chgTime(key,set,Math.min(max,v+5))} style={{width:30,height:30,borderRadius:8,border:"1px solid var(--border)",background:"var(--card2)",color:"var(--text)",fontSize:18,cursor:"pointer"}}>+</button>
+            </div>
+          </div>
+        ))}
+      </div>
+
       {/* Circuit preview */}
       <div className="card" style={{marginBottom:16}}>
         <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
           <div style={{fontSize:13,fontWeight:700,color:"var(--muted2)"}}>PLAN OBWODU ({localCircuit.length} ćwiczeń)</div>
-          <button onClick={()=>setEditMode(e=>!e)} style={{fontSize:11,padding:"4px 10px",borderRadius:8,border:`1px solid ${editMode?"#a855f7":"var(--border)"}`,background:editMode?"#a855f722":"var(--card2)",color:editMode?"#a855f7":"var(--muted)",cursor:"pointer"}}>✏️ Edytuj</button>
+          <div style={{display:"flex",gap:6}}>
+            {editMode&&<button onClick={()=>setShowAddEx(s=>!s)} style={{fontSize:11,padding:"4px 10px",borderRadius:8,border:"1px solid #22c55e",background:showAddEx?"#22c55e22":"var(--card2)",color:"#22c55e",cursor:"pointer"}}>+ Dodaj</button>}
+            <button onClick={()=>{setEditMode(e=>!e);setShowAddEx(false);}} style={{fontSize:11,padding:"4px 10px",borderRadius:8,border:`1px solid ${editMode?"#a855f7":"var(--border)"}`,background:editMode?"#a855f722":"var(--card2)",color:editMode?"#a855f7":"var(--muted)",cursor:"pointer"}}>✏️ {editMode?"Gotowe":"Edytuj"}</button>
+          </div>
         </div>
+
+        {/* Add new exercise form */}
+        {editMode&&showAddEx&&(
+          <div style={{background:"var(--card2)",borderRadius:10,padding:"10px",marginBottom:10,border:"1px solid #22c55e44"}}>
+            <div style={{fontSize:11,color:"var(--muted)",marginBottom:6,fontWeight:700}}>NOWE ĆWICZENIE</div>
+            <input placeholder="Nazwa ćwiczenia" value={newEx.name}
+              onChange={e=>setNewEx(p=>({...p,name:e.target.value}))}
+              style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 10px",color:"var(--text)",fontSize:13,outline:"none",boxSizing:"border-box",marginBottom:8}}/>
+            <div style={{display:"flex",gap:8,alignItems:"center",marginBottom:8}}>
+              <div style={{flex:1}}>
+                <div style={{fontSize:10,color:"var(--muted)",marginBottom:3}}>{newEx.isTime?"Czas (sek)":"Powtórzenia"}</div>
+                <input type="number" min="1" value={newEx.reps}
+                  onChange={e=>setNewEx(p=>({...p,reps:e.target.value}))}
+                  style={{width:"100%",background:"var(--bg)",border:"1px solid var(--border)",borderRadius:8,padding:"8px 10px",color:"var(--text)",fontSize:13,outline:"none",boxSizing:"border-box"}}/>
+              </div>
+              <div style={{display:"flex",flexDirection:"column",alignItems:"center",gap:4}}>
+                <div style={{fontSize:10,color:"var(--muted)"}}>Typ</div>
+                <button onClick={()=>setNewEx(p=>({...p,isTime:!p.isTime}))}
+                  style={{padding:"6px 10px",borderRadius:8,border:`1px solid ${newEx.isTime?"#eab308":"var(--border)"}`,background:newEx.isTime?"#eab30822":"var(--card)",color:newEx.isTime?"#eab308":"var(--muted)",fontSize:11,cursor:"pointer"}}>
+                  {newEx.isTime?"⏱ sek":"🔢 rep"}
+                </button>
+              </div>
+            </div>
+            <button onClick={()=>{
+              if(!newEx.name.trim()||!newEx.reps) return;
+              const ex={id:"custom_"+Date.now(),name:newEx.name.trim(),reps:Number(newEx.reps),isTime:newEx.isTime};
+              setLocalCircuit(c=>[...c,ex]);
+              // Save custom circuit to gymData
+              setNewEx({name:"",reps:"10",isTime:false});
+              setShowAddEx(false);
+            }} style={{width:"100%",background:"#22c55e",border:"none",borderRadius:8,padding:"8px",color:"#fff",fontWeight:700,fontSize:13,cursor:"pointer"}}>
+              ✅ Dodaj do obwodu
+            </button>
+          </div>
+        )}
+
         {localCircuit.map((ex,i)=>(
           <div key={ex.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 0",borderBottom:"1px solid var(--border)"}}>
             <span style={{fontSize:12,color:"var(--muted2)"}}>{i+1}. {ex.name}</span>
@@ -1765,20 +1848,23 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
               <div style={{display:"flex",gap:4,alignItems:"center"}}>
                 <button onClick={()=>{if(i>0){const a=[...localCircuit];[a[i-1],a[i]]=[a[i],a[i-1]];setLocalCircuit(a);}}} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:14}}>▲</button>
                 <button onClick={()=>{if(i<localCircuit.length-1){const a=[...localCircuit];[a[i],a[i+1]]=[a[i+1],a[i]];setLocalCircuit(a);}}} style={{background:"none",border:"none",color:"var(--muted)",cursor:"pointer",fontSize:14}}>▼</button>
-                <button onClick={()=>setLocalCircuit(c=>c.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:14}}>×</button>
+                <button onClick={()=>setLocalCircuit(c=>c.filter((_,j)=>j!==i))} style={{background:"none",border:"none",color:"#ef4444",cursor:"pointer",fontSize:14,padding:"0 4px"}}>🗑️</button>
               </div>
             ):(
               <span style={{fontFamily:"'Bebas Neue'",fontSize:14,color}}>{ex.reps}{ex.isTime?"s":"x"}</span>
             )}
           </div>
         ))}
+
+        {editMode&&<div style={{fontSize:10,color:"var(--muted)",textAlign:"center",marginTop:8,paddingTop:8,borderTop:"1px solid var(--border)"}}>
+          ▲▼ zmiana kolejności · 🗑️ usunięcie · zmiany zapisują się automatycznie
+        </div>}
       </div>
 
       <button onClick={()=>{
-        setLocalCircuit(circuit);
         setPhase("warmup_joints");
         setStep(0);
-        setTimer(WARMUP_JOINTS[0].duration);
+        setTimer(jointSec);
         speak("Zaczynamy rozgrzewkę stawów. "+WARMUP_JOINTS[0].name);
         beep(2);
       }} style={{width:"100%",background:color,border:"none",borderRadius:14,padding:"16px",color:"#fff",fontFamily:"'Bebas Neue'",fontSize:22,cursor:"pointer",letterSpacing:2}}>
@@ -1863,7 +1949,7 @@ function GimnastykaView({onBack,saveDay,todayStr,settings={}}) {
               <div style={{fontFamily:"'Bebas Neue'",fontSize:56,color}}>{timer}</div>
             </div>
             <div style={{fontSize:22,fontWeight:700,color:"var(--text)",marginTop:8}}>{curEx.name}</div>
-            <div style={{fontSize:12,color:"var(--muted)"}}>10 sekund</div>
+            <div style={{fontSize:12,color:"var(--muted)"}}>{jointSec} sekund</div>
             {step<WARMUP_JOINTS.length-1&&(
               <div style={{fontSize:12,color:"var(--muted)"}}>Następne: {WARMUP_JOINTS[step+1].name}</div>
             )}
